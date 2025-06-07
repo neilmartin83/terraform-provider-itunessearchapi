@@ -16,7 +16,7 @@ func New() provider.Provider {
 type iTunesProvider struct{}
 
 func (p *iTunesProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
-	resp.TypeName = "itunes"
+	resp.TypeName = "itunessearchapi"
 }
 
 func (p *iTunesProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {

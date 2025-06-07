@@ -29,7 +29,7 @@ type softwareDataSourceModel struct {
 }
 
 func (d *softwareDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	resp.TypeName = "itunes_software"
+	resp.TypeName = "software"
 }
 
 func (d *softwareDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
