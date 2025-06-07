@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 
+	itunessearchapi "github.com/neilmartin83/terraform-provider-itunessearchapi/internal/provider"
+
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 )
 
