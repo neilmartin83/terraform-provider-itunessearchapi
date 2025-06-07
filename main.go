@@ -1,4 +1,4 @@
-package itunessearchapi
+package main
 
 import (
 	"context"
@@ -10,6 +10,6 @@ import (
 
 func main() {
 	providerserver.Serve(context.Background(), itunessearchapi.New, providerserver.ServeOpts{
-		Address: "registry.terraform.io/example/itunes",
+		Address: "registry.terraform.io/neilmartin83/itunessearchapi",
 	})
 }
