@@ -1,0 +1,38 @@
+package itunessearchapi
+
+import (
+	"context"
+
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/provider"
+	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+)
+
+func New() provider.Provider {
+	return &iTunesProvider{}
+}
+
+type iTunesProvider struct{}
+
+func (p *iTunesProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
+	resp.TypeName = "itunes"
+}
+
+func (p *iTunesProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
+	resp.Schema = schema.Schema{} // No provider-level configuration needed
+}
+
+func (p *iTunesProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
+	// No-op: no provider-level configuration
+}
+
+func (p *iTunesProvider) Resources(_ context.Context) []func() resource.Resource {
+	return nil
+}
+
+func (p *iTunesProvider) DataSources(_ context.Context) []func() datasource.DataSource {
+	return []func() datasource.DataSource{
+		NewSoftwareDataSource,
+	}
+}
