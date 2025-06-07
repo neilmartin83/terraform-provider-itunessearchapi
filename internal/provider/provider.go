@@ -20,11 +20,12 @@ func (p *iTunesProvider) Metadata(_ context.Context, _ provider.MetadataRequest,
 }
 
 func (p *iTunesProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
-	resp.Schema = schema.Schema{} // No provider-level configuration needed
+	resp.Schema = schema.Schema{
+		Description: "Interact with the iTunes Search API: https://performance-partners.apple.com/search-api.",
+	}
 }
 
 func (p *iTunesProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
-	// No-op: no provider-level configuration
 }
 
 func (p *iTunesProvider) Resources(_ context.Context) []func() resource.Resource {
@@ -33,6 +34,6 @@ func (p *iTunesProvider) Resources(_ context.Context) []func() resource.Resource
 
 func (p *iTunesProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
-		NewSoftwareDataSource,
+		NewContentDataSource,
 	}
 }
