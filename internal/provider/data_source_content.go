@@ -318,6 +318,9 @@ func (d *contentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	var resultItems []attr.Value
 	for _, item := range apiResp.Results {
 		artworkURL := getString(item, "artworkUrl512")
+		if artworkURL != "" && strings.HasSuffix(artworkURL, ".jpg") {
+			artworkURL = strings.TrimSuffix(artworkURL, ".jpg") + ".png"
+		}
 
 		var artworkBase64 string
 		if artworkURL != "" {
