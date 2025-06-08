@@ -2,8 +2,10 @@ package itunessearchapi
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -32,6 +34,7 @@ var contentAttributeTypes = map[string]attr.Type{
 	"file_size_bytes":    types.Int64Type,
 	"artist_view_url":    types.StringType,
 	"artwork_url":        types.StringType,
+	"artwork_base64":     types.StringType,
 	"track_view_url":     types.StringType,
 	"supported_devices":  types.ListType{ElemType: types.StringType},
 	"genres":             types.ListType{ElemType: types.StringType},
@@ -207,6 +210,35 @@ func parseAppStoreURL(urlStr string) (trackID int64, countryCode string, err err
 	return trackID, countryCode, nil
 }
 
+// downloadAndEncodeImage downloads an image from a URL and returns it as a base64 encoded string
+func downloadAndEncodeImage(imageURL string) (string, error) {
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", imageURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("error creating request: %v", err)
+	}
+
+	req.Header.Add("Accept", "image/*")
+	req.Header.Add("User-Agent", "Terraform-Provider")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("error downloading image: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("error downloading image, status code: %d", resp.StatusCode)
+	}
+
+	imageData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("error reading image data: %v", err)
+	}
+
+	return base64.StdEncoding.EncodeToString(imageData), nil
+}
+
 // Read implements the datasource.Read method for the content data source.
 func (d *contentDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var data contentDataSourceModel
@@ -285,6 +317,18 @@ func (d *contentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 
 	var resultItems []attr.Value
 	for _, item := range apiResp.Results {
+		artworkURL := getString(item, "artworkUrl512")
+
+		var artworkBase64 string
+		if artworkURL != "" {
+			encoded, err := downloadAndEncodeImage(artworkURL)
+			if err != nil {
+				fmt.Printf("Warning: Failed to download artwork for %s: %v\n", getString(item, "trackName"), err)
+			} else {
+				artworkBase64 = encoded
+			}
+		}
+
 		attrs := map[string]attr.Value{
 			"track_name":         types.StringValue(getString(item, "trackName")),
 			"bundle_id":          types.StringValue(getString(item, "bundleId")),
@@ -302,6 +346,7 @@ func (d *contentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 			"file_size_bytes":    types.Int64Value(getInt64(item, "fileSizeBytes")),
 			"artist_view_url":    types.StringValue(getString(item, "artistViewUrl")),
 			"artwork_url":        types.StringValue(getString(item, "artworkUrl512")),
+			"artwork_base64":     types.StringValue(artworkBase64),
 			"track_view_url":     types.StringValue(getString(item, "trackViewUrl")),
 			"supported_devices":  types.ListValueMust(types.StringType, getStringList(item, "supportedDevices")),
 			"genres":             types.ListValueMust(types.StringType, getStringList(item, "genres")),

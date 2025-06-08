@@ -71,6 +71,7 @@ output "content_by_id" {
 Read-Only:
 
 - `artist_view_url` (String)
+- `artwork_base64` (String)
 - `artwork_url` (String)
 - `average_rating` (Number)
 - `bundle_id` (String)
