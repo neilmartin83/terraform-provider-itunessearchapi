@@ -21,6 +21,11 @@ data "itunessearchapi_content" "example" {
   limit   = 3
 }
 
+# Lookup content by App Store URL
+data "itunessearchapi_content" "example_by_url" {
+  app_store_url = "https://apps.apple.com/gb/app/messenger/id1480068668?mt=12"
+}
+
 # Lookup content by specific iTunes ID and country
 data "itunessearchapi_content" "example_by_id" {
   id      = "462054704"
@@ -30,6 +35,11 @@ data "itunessearchapi_content" "example_by_id" {
 # Output the results of the content search
 output "content_results" {
   value = data.itunessearchapi_content.example.results
+}
+
+# Output the results of the content lookup by URL
+output "content_by_url" {
+  value = data.itunessearchapi_content.example_by_url.results
 }
 
 # Output the results of the content lookup by ID
@@ -43,6 +53,7 @@ output "content_by_id" {
 
 ### Optional
 
+- `app_store_url` (String) App Store URL (e.g., https://apps.apple.com/gb/app/facebook/id284882215). Mutually exclusive with term and id.
 - `country` (String) ISO 2-letter country code. See http://en.wikipedia.org/wiki/ ISO_3166-1_alpha-2 for a list of ISO Country Codes.
 - `entity` (String) The type of results you want returned, relative to the specified media type. For example: movieArtist for a movie media type search. The default is the track entity associated with the specified media type.
 - `id` (Number) iTunes ID to look up specific content. Mutually exclusive with term.

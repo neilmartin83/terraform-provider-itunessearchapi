@@ -6,6 +6,11 @@ data "itunessearchapi_content" "example" {
   limit   = 3
 }
 
+# Lookup content by App Store URL
+data "itunessearchapi_content" "example_by_url" {
+  app_store_url = "https://apps.apple.com/gb/app/messenger/id1480068668?mt=12"
+}
+
 # Lookup content by specific iTunes ID and country
 data "itunessearchapi_content" "example_by_id" {
   id      = "462054704"
@@ -15,6 +20,11 @@ data "itunessearchapi_content" "example_by_id" {
 # Output the results of the content search
 output "content_results" {
   value = data.itunessearchapi_content.example.results
+}
+
+# Output the results of the content lookup by URL
+output "content_by_url" {
+  value = data.itunessearchapi_content.example_by_url.results
 }
 
 # Output the results of the content lookup by ID

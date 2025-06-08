@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -40,28 +42,36 @@ var contentAttributeTypes = map[string]attr.Type{
 
 type contentDataSource struct{}
 
+// NewContentDataSource creates a new instance of the content data source.
 func NewContentDataSource() datasource.DataSource {
 	return &contentDataSource{}
 }
 
 type contentDataSourceModel struct {
-	Term    types.String `tfsdk:"term"`
-	ID      types.Int64  `tfsdk:"id"`
-	Country types.String `tfsdk:"country"`
-	Media   types.String `tfsdk:"media"`
-	Entity  types.String `tfsdk:"entity"`
-	Limit   types.Int64  `tfsdk:"limit"`
-	Results types.List   `tfsdk:"results"`
+	AppStoreURL types.String `tfsdk:"app_store_url"`
+	Term        types.String `tfsdk:"term"`
+	ID          types.Int64  `tfsdk:"id"`
+	Country     types.String `tfsdk:"country"`
+	Media       types.String `tfsdk:"media"`
+	Entity      types.String `tfsdk:"entity"`
+	Limit       types.Int64  `tfsdk:"limit"`
+	Results     types.List   `tfsdk:"results"`
 }
 
+// Metadata implements the datasource.DataSource interface for the content data source.
 func (d *contentDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_content"
 }
 
+// Schema implements the datasource.DataSource interface for the content data source.
 func (d *contentDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Search for, or lookup content in the iTunes Store.",
 		Attributes: map[string]schema.Attribute{
+			"app_store_url": schema.StringAttribute{
+				Optional:    true,
+				Description: "App Store URL (e.g., https://apps.apple.com/gb/app/facebook/id284882215). Mutually exclusive with term and id.",
+			},
 			"term": schema.StringAttribute{
 				Optional:    true,
 				Description: "Search term (e.g. app name). Mutually exclusive with id.",
@@ -97,6 +107,7 @@ func (d *contentDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 	}
 }
 
+// getString retrieves a string value from a map by key, converting it to a string if necessary.
 func getString(m map[string]interface{}, key string) string {
 	if v, ok := m[key]; ok && v != nil {
 		return fmt.Sprintf("%v", v)
@@ -104,6 +115,7 @@ func getString(m map[string]interface{}, key string) string {
 	return ""
 }
 
+// getFloat64 retrieves a float64 value from a map by key, handling both float64 and int types.
 func getFloat64(m map[string]interface{}, key string) float64 {
 	if v, ok := m[key]; ok {
 		switch val := v.(type) {
@@ -116,6 +128,7 @@ func getFloat64(m map[string]interface{}, key string) float64 {
 	return 0
 }
 
+// getInt64 retrieves an int64 value from a map by key, handling both float64 and int types.
 func getInt64(m map[string]interface{}, key string) int64 {
 	if v, ok := m[key]; ok {
 		switch val := v.(type) {
@@ -128,6 +141,7 @@ func getInt64(m map[string]interface{}, key string) int64 {
 	return 0
 }
 
+// getStringList retrieves a list of strings from a map by key.
 func getStringList(m map[string]interface{}, key string) []attr.Value {
 	var list []attr.Value
 	if v, ok := m[key]; ok {
@@ -140,6 +154,7 @@ func getStringList(m map[string]interface{}, key string) []attr.Value {
 	return list
 }
 
+// addCommonParameters adds common query parameters to the URL query.
 func addCommonParameters(query url.Values, data *contentDataSourceModel) {
 	if !data.Entity.IsNull() {
 		query.Set("entity", data.Entity.ValueString())
@@ -152,6 +167,47 @@ func addCommonParameters(query url.Values, data *contentDataSourceModel) {
 	}
 }
 
+// parseAppStoreURL parses an App Store URL and extracts the track ID and country code.
+func parseAppStoreURL(urlStr string) (trackID int64, countryCode string, err error) {
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return 0, "", fmt.Errorf("invalid URL format: %v", err)
+	}
+
+	if parsedURL.Host != "apps.apple.com" {
+		return 0, "", fmt.Errorf("URL must be from apps.apple.com")
+	}
+
+	parts := strings.Split(strings.Trim(parsedURL.Path, "/"), "/")
+	if len(parts) < 4 {
+		return 0, "", fmt.Errorf("invalid App Store URL format")
+	}
+
+	countryCode = parts[0]
+	if len(countryCode) != 2 {
+		return 0, "", fmt.Errorf("invalid country code in URL")
+	}
+
+	idPart := parts[len(parts)-1]
+	idStr := idPart
+
+	if strings.Contains(idPart, "?") {
+		idStr = strings.Split(idPart, "?")[0]
+	}
+
+	if !strings.HasPrefix(idStr, "id") {
+		return 0, "", fmt.Errorf("invalid track ID format in URL")
+	}
+
+	trackID, err = strconv.ParseInt(strings.TrimPrefix(idStr, "id"), 10, 64)
+	if err != nil {
+		return 0, "", fmt.Errorf("invalid track ID number: %v", err)
+	}
+
+	return trackID, countryCode, nil
+}
+
+// Read implements the datasource.Read method for the content data source.
 func (d *contentDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var data contentDataSourceModel
 	diags := req.Config.Get(ctx, &data)
@@ -160,13 +216,41 @@ func (d *contentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
-	if data.Term.IsNull() == data.ID.IsNull() {
-		resp.Diagnostics.AddError("Invalid Input", "You must provide either 'term' or 'id', but not both.")
+	paramCount := 0
+	if !data.Term.IsNull() {
+		paramCount++
+	}
+	if !data.ID.IsNull() {
+		paramCount++
+	}
+	if !data.AppStoreURL.IsNull() {
+		paramCount++
+	}
+
+	if paramCount != 1 {
+		resp.Diagnostics.AddError(
+			"Invalid Input",
+			"You must provide exactly one of: 'term', 'id', or 'app_store_url'.",
+		)
 		return
 	}
 
 	var apiURL string
-	if !data.ID.IsNull() {
+	if !data.AppStoreURL.IsNull() {
+		trackID, countryCode, err := parseAppStoreURL(data.AppStoreURL.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Invalid App Store URL", err.Error())
+			return
+		}
+
+		data.ID = types.Int64Value(trackID)
+		data.Country = types.StringValue(countryCode)
+
+		query := url.Values{}
+		query.Set("id", fmt.Sprintf("%d", trackID))
+		addCommonParameters(query, &data)
+		apiURL = fmt.Sprintf("https://itunes.apple.com/lookup?%s", query.Encode())
+	} else if !data.ID.IsNull() {
 		query := url.Values{}
 		query.Set("id", fmt.Sprintf("%d", data.ID.ValueInt64()))
 		addCommonParameters(query, &data)
