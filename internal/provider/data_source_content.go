@@ -43,11 +43,15 @@ var contentAttributeTypes = map[string]attr.Type{
 	"rating_count":       types.Int64Type,
 }
 
-type contentDataSource struct{}
+type contentDataSource struct {
+	provider *iTunesProvider
+}
 
 // NewContentDataSource creates a new instance of the content data source.
-func NewContentDataSource() datasource.DataSource {
-	return &contentDataSource{}
+func NewContentDataSource(p *iTunesProvider) datasource.DataSource {
+	return &contentDataSource{
+		provider: p,
+	}
 }
 
 type contentDataSourceModel struct {
@@ -210,32 +214,35 @@ func parseAppStoreURL(urlStr string) (trackID int64, countryCode string, err err
 	return trackID, countryCode, nil
 }
 
-// downloadAndEncodeImage downloads an image from a URL and returns it as a base64 encoded string
-func downloadAndEncodeImage(imageURL string) (string, error) {
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", imageURL, nil)
+// downloadImage downloads an image from the specified URL and returns its byte content.
+func (p *iTunesProvider) downloadImage(ctx context.Context, imageURL string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", imageURL, nil)
 	if err != nil {
-		return "", fmt.Errorf("error creating request: %v", err)
+		return nil, fmt.Errorf("error creating request: %v", err)
 	}
 
+	req.Header.Add("User-Agent", "Terraform-Provider-iTunesSearchAPI")
 	req.Header.Add("Accept", "image/*")
-	req.Header.Add("User-Agent", "Terraform-Provider")
 
-	resp, err := client.Do(req)
+	resp, err := p.imgClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("error downloading image: %v", err)
+		return nil, fmt.Errorf("error downloading image: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("error downloading image, status code: %d", resp.StatusCode)
+		return nil, fmt.Errorf("image download failed with status code: %d", resp.StatusCode)
 	}
 
-	imageData, err := io.ReadAll(resp.Body)
+	return io.ReadAll(resp.Body)
+}
+
+// downloadAndEncodeImage downloads an image from a URL and returns it as a base64 encoded string
+func (p *iTunesProvider) downloadAndEncodeImage(ctx context.Context, imageURL string) (string, error) {
+	imageData, err := p.downloadImage(ctx, imageURL)
 	if err != nil {
-		return "", fmt.Errorf("error reading image data: %v", err)
+		return "", err
 	}
-
 	return base64.StdEncoding.EncodeToString(imageData), nil
 }
 
@@ -299,7 +306,7 @@ func (d *contentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		apiURL = fmt.Sprintf("https://itunes.apple.com/search?%s", query.Encode())
 	}
 
-	httpResp, err := http.Get(apiURL)
+	httpResp, err := d.provider.doRateLimitedRequest(ctx, apiURL)
 	if err != nil {
 		resp.Diagnostics.AddError("API request failed", err.Error())
 		return
@@ -324,7 +331,7 @@ func (d *contentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 
 		var artworkBase64 string
 		if artworkURL != "" {
-			encoded, err := downloadAndEncodeImage(artworkURL)
+			encoded, err := d.provider.downloadAndEncodeImage(ctx, artworkURL)
 			if err != nil {
 				fmt.Printf("Warning: Failed to download artwork for %s: %v\n", getString(item, "trackName"), err)
 			} else {
