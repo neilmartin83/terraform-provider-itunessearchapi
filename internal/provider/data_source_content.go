@@ -228,7 +228,11 @@ func (p *iTunesProvider) downloadImage(ctx context.Context, imageURL string) ([]
 	if err != nil {
 		return nil, fmt.Errorf("error downloading image: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			fmt.Printf("warning: failed to close response body: %v\n", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("image download failed with status code: %d", resp.StatusCode)
@@ -311,7 +315,11 @@ func (d *contentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		resp.Diagnostics.AddError("API request failed", err.Error())
 		return
 	}
-	defer httpResp.Body.Close()
+	defer func() {
+		if err := httpResp.Body.Close(); err != nil {
+			fmt.Printf("warning: failed to close response body: %v\n", err)
+		}
+	}()
 
 	var apiResp struct {
 		Results []map[string]interface{} `json:"results"`

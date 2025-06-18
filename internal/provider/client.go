@@ -26,7 +26,10 @@ func (p *iTunesProvider) doRateLimitedRequest(ctx context.Context, url string) (
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
+		if cerr := resp.Body.Close(); cerr != nil {
+			return nil, fmt.Errorf("API request failed with status code: %d and error closing response body: %v",
+				resp.StatusCode, cerr)
+		}
 		return nil, fmt.Errorf("API request failed with status code: %d", resp.StatusCode)
 	}
 
