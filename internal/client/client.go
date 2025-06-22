@@ -30,6 +30,11 @@ type APIError struct {
 	Message    string
 }
 
+type NotFoundError struct {
+	MissingIDs  []int64
+	MissingURLs []string
+}
+
 type ContentResponse struct {
 	Results []ContentResult `json:"results"`
 }
@@ -110,10 +115,55 @@ func (c *Client) Configure(ctx context.Context, config Config) error {
 	return nil
 }
 
+// Error implements the error interface for APIError.
+// It returns a formatted string containing the HTTP status code and error message.
+//
+// Returns:
+//   - string: A formatted error message in the format "API error (HTTP {status}): {message}"
 func (e *APIError) Error() string {
 	return fmt.Sprintf("API error (HTTP %d): %s", e.StatusCode, e.Message)
 }
 
+// Error implements the error interface for NotFoundError.
+// It returns a formatted string containing either missing IDs or URLs based on which field is populated.
+//
+// Returns:
+//   - string: A formatted error message listing either missing IDs or URLs
+//
+// The function prioritizes MissingIDs over MissingURLs if both are present.
+func (e *NotFoundError) Error() string {
+	if len(e.MissingIDs) > 0 {
+		return fmt.Sprintf("The following IDs were not found: %v", e.MissingIDs)
+	}
+	return fmt.Sprintf("The following URLs were not found: %v", e.MissingURLs)
+}
+
+// Search performs a search against the iTunes Search API with the provided parameters.
+//
+// Parameters:
+//   - ctx: Context for request cancellation and timeout
+//   - term: Search term to query (required)
+//   - media: Media type to search (e.g., "software", "music"). Defaults to "all" if empty
+//   - entity: The type of results to return, relative to the specified media type
+//   - country: Two-letter country code for store-specific results
+//   - limit: Maximum number of results to return
+//
+// Returns:
+//   - *ContentResponse: Pointer to the parsed API response containing search results
+//   - error: Any error encountered during the request or response processing
+//
+// The function performs a rate-limited HTTP GET request to the iTunes Search API,
+// automatically handling response parsing and cleanup. It will return an error if:
+//   - The rate limiter encounters an error
+//   - The HTTP request fails
+//   - The response cannot be decoded
+//
+// Example:
+//
+//	result, err := client.Search(ctx, "Xcode", "software", "", "US", 1)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
 func (c *Client) Search(ctx context.Context, term, media, entity, country string, limit int64) (*ContentResponse, error) {
 	query := url.Values{}
 	query.Set("term", term)
@@ -202,7 +252,7 @@ func (c *Client) downloadImage(ctx context.Context, imageURL string) ([]byte, er
 	return io.ReadAll(resp.Body)
 }
 
-// DownloadAndEncodeImage downloads an image from a URL and returns it as a base64 encoded string
+// DownloadAndEncodeImage downloads an image from a URL and returns it as a base64 encoded string.
 func (c *Client) DownloadAndEncodeImage(ctx context.Context, imageURL string) (string, error) {
 	imageData, err := c.downloadImage(ctx, imageURL)
 	if err != nil {
@@ -311,7 +361,7 @@ func (c *Client) AddCommonParameters(query url.Values, entity, country string, l
 	}
 }
 
-// StringifyIDs converts a slice of int64 to a slice of strings
+// StringifyIDs converts a slice of int64 to a slice of strings.
 func (c *Client) StringifyIDs(ids []int64) []string {
 	strIDs := make([]string, len(ids))
 	for i, id := range ids {
@@ -320,7 +370,7 @@ func (c *Client) StringifyIDs(ids []int64) []string {
 	return strIDs
 }
 
-// ChunkIDs splits a slice of IDs into batches of maxLookupBatchSize
+// ChunkIDs splits a slice of IDs into batches of maxLookupBatchSize.
 func (c *Client) ChunkIDs(ids []int64) [][]int64 {
 	var batches [][]int64
 	for i := 0; i < len(ids); i += maxLookupBatchSize {
@@ -333,7 +383,7 @@ func (c *Client) ChunkIDs(ids []int64) [][]int64 {
 	return batches
 }
 
-// ProcessBatch processes a batch of IDs and returns the results
+// ProcessBatch processes a batch of IDs and returns the results.
 func (c *Client) ProcessBatch(ctx context.Context, ids []int64, entity, country string, limit int64) (*ContentResponse, error) {
 	query := url.Values{}
 	query.Set("id", strings.Join(c.StringifyIDs(ids), ","))
@@ -355,6 +405,22 @@ func (c *Client) ProcessBatch(ctx context.Context, ids []int64, entity, country 
 	var result ContentResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("error decoding API response: %w", err)
+	}
+
+	foundIDs := make(map[int64]bool)
+	for _, item := range result.Results {
+		foundIDs[item.TrackID] = true
+	}
+
+	var missingIDs []int64
+	for _, id := range ids {
+		if !foundIDs[id] {
+			missingIDs = append(missingIDs, id)
+		}
+	}
+
+	if len(missingIDs) > 0 {
+		return &result, &NotFoundError{MissingIDs: missingIDs}
 	}
 
 	return &result, nil

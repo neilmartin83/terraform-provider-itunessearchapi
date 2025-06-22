@@ -61,12 +61,12 @@ func NewContentDataSource(client *client.Client) datasource.DataSource {
 	}
 }
 
-// Metadata implements the datasource.DataSource interface for the content data source.
+// Metadata returns the data source type name.
 func (d *contentDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_content"
 }
 
-// Schema implements the datasource.DataSource interface for the content data source.
+// Schema defines the schema for the data source.
 func (d *contentDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Search for, or lookup content in the iTunes Store.",
@@ -112,7 +112,7 @@ func (d *contentDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 	}
 }
 
-// Read implements the datasource.Read method for the content data source.
+// Read handles the data source read operation
 func (d *contentDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var data contentDataSourceModel
 	diags := req.Config.Get(ctx, &data)
@@ -152,6 +152,7 @@ func (d *contentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 
 		var trackIDs []int64
 		countryCode := ""
+		var allMissingURLs []string
 
 		for _, urlStr := range urls {
 			trackID, country, err := d.client.ParseAppStoreURL(urlStr)
@@ -181,11 +182,30 @@ func (d *contentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 				data.Entity.ValueString(),
 				data.Country.ValueString(),
 				data.Limit.ValueInt64())
+
 			if err != nil {
+				if notFoundErr, ok := err.(*client.NotFoundError); ok {
+					for _, id := range notFoundErr.MissingIDs {
+						for _, url := range urls {
+							if strings.Contains(url, fmt.Sprintf("id%d", id)) {
+								allMissingURLs = append(allMissingURLs, url)
+							}
+						}
+					}
+					continue
+				}
 				resp.Diagnostics.AddError("API Request Failed", err.Error())
 				return
 			}
 			results = append(results, result.Results...)
+		}
+
+		if len(allMissingURLs) > 0 {
+			resp.Diagnostics.AddError(
+				"Some URLs not found",
+				fmt.Sprintf("The following URLs were not found: %v", allMissingURLs),
+			)
+			return
 		}
 
 	} else if !data.IDs.IsNull() {
@@ -196,17 +216,31 @@ func (d *contentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 			return
 		}
 
+		var allMissingIDs []int64
 		batches := d.client.ChunkIDs(ids)
 		for _, batch := range batches {
 			result, err := d.client.ProcessBatch(ctx, batch,
 				data.Entity.ValueString(),
 				data.Country.ValueString(),
 				data.Limit.ValueInt64())
+
 			if err != nil {
+				if notFoundErr, ok := err.(*client.NotFoundError); ok {
+					allMissingIDs = append(allMissingIDs, notFoundErr.MissingIDs...)
+					continue
+				}
 				resp.Diagnostics.AddError("API Request Failed", err.Error())
 				return
 			}
 			results = append(results, result.Results...)
+		}
+
+		if len(allMissingIDs) > 0 {
+			resp.Diagnostics.AddError(
+				"Resources Not Found",
+				fmt.Sprintf("The following IDs were not found: %v", allMissingIDs),
+			)
+			return
 		}
 
 	} else {
@@ -286,7 +320,7 @@ func (d *contentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	resp.State.Set(ctx, &data)
 }
 
-// Helper function to convert string slice to attr.Value slice
+// Helper function to convert string slice to attr.Value slice.
 func convertToAttrValues(strings []string) []attr.Value {
 	values := make([]attr.Value, len(strings))
 	for i, s := range strings {
