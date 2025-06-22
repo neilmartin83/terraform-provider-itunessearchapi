@@ -14,37 +14,43 @@ Search for, or lookup content in the iTunes Store.
 
 ```terraform
 # Search for content using a term and country
-data "itunessearchapi_content" "example" {
+data "itunessearchapi_content" "term_search" {
   term    = "Microsoft Word"
   country = "gb"
   media   = "software"
   limit   = 3
 }
 
-# Lookup content by App Store URL
-data "itunessearchapi_content" "example_by_url" {
-  app_store_url = "https://apps.apple.com/gb/app/messenger/id1480068668?mt=12"
-}
-
-# Lookup content by specific iTunes ID and country
-data "itunessearchapi_content" "example_by_id" {
-  id      = "462054704"
+# Lookup content by App Store URLs
+data "itunessearchapi_content" "app_lookups" {
+  app_store_urls = [
+    "https://apps.apple.com/gb/app/messenger/id1480068668?mt=12"
+  ]
   country = "gb"
 }
 
-# Output the results of the content search
-output "content_results" {
-  value = data.itunessearchapi_content.example.results
+# Outputs for term search results
+output "term_search_results" {
+  value = data.itunessearchapi_content.term_search.results
 }
 
-# Output the results of the content lookup by URL
-output "content_by_url" {
-  value = data.itunessearchapi_content.example_by_url.results
-}
+# Outputs for lookups
+output "lookup_results" {
+  value = {
+    # Results by URL - using track_id to identify specific apps
+    by_url = {
+      for result in data.itunessearchapi_content.app_lookups.results :
+      result.track_view_url => result
+      if contains([1480068668], result.track_id) # Filter for Messenger app
+    }
 
-# Output the results of the content lookup by ID
-output "content_by_id" {
-  value = data.itunessearchapi_content.example_by_id.results
+    # Results by ID
+    by_id = {
+      for result in data.itunessearchapi_content.app_lookups.results :
+      result.track_id => result
+      if contains([462054704], result.track_id) # Filter for specific ID
+    }
+  }
 }
 ```
 
@@ -53,11 +59,11 @@ output "content_by_id" {
 
 ### Optional
 
-- `app_store_url` (String) App Store URL (e.g., https://apps.apple.com/gb/app/facebook/id284882215). Mutually exclusive with term and id.
-- `country` (String) ISO 2-letter country code. See http://en.wikipedia.org/wiki/ ISO_3166-1_alpha-2 for a list of ISO Country Codes.
-- `entity` (String) The type of results you want returned, relative to the specified media type. For example: movieArtist for a movie media type search. The default is the track entity associated with the specified media type.
-- `id` (Number) iTunes ID to look up specific content. Mutually exclusive with term.
-- `limit` (Number) Maximum number of results when searching by term.
+- `app_store_urls` (List of String) List of App Store URLs. Mutually exclusive with term and ids.
+- `country` (String) ISO 2-letter country code. See http://en.wikipedia.org/wiki/ISO_3166-1_alpha-2 for a list of ISO Country Codes.
+- `entity` (String) The type of results you want returned, relative to the specified media type.
+- `ids` (List of Number) List of iTunes IDs to look up specific content. Mutually exclusive with term.
+- `limit` (Number) Maximum number of results.
 - `media` (String) Media type, defaults to 'all'. Supported values: 'movie', 'podcast', 'music', 'musicVideo', 'audiobook', 'shortFilm', 'tvShow', 'software', 'ebook', 'all'
 - `term` (String) Search term (e.g. app name). Mutually exclusive with id.
 

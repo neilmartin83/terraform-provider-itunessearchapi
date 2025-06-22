@@ -2,10 +2,7 @@ package content
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/url"
-	"strconv"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -30,7 +27,7 @@ var contentAttributeTypes = map[string]attr.Type{
 	"version":            types.StringType,
 	"primary_genre":      types.StringType,
 	"minimum_os_version": types.StringType,
-	"file_size_bytes":    types.Int64Type,
+	"file_size_bytes":    types.StringType,
 	"artist_view_url":    types.StringType,
 	"artwork_url":        types.StringType,
 	"artwork_base64":     types.StringType,
@@ -47,14 +44,14 @@ type contentDataSource struct {
 }
 
 type contentDataSourceModel struct {
-	AppStoreURL types.String `tfsdk:"app_store_url"`
-	Term        types.String `tfsdk:"term"`
-	ID          types.Int64  `tfsdk:"id"`
-	Country     types.String `tfsdk:"country"`
-	Media       types.String `tfsdk:"media"`
-	Entity      types.String `tfsdk:"entity"`
-	Limit       types.Int64  `tfsdk:"limit"`
-	Results     types.List   `tfsdk:"results"`
+	AppStoreURLs types.List   `tfsdk:"app_store_urls"`
+	Term         types.String `tfsdk:"term"`
+	IDs          types.List   `tfsdk:"ids"`
+	Country      types.String `tfsdk:"country"`
+	Media        types.String `tfsdk:"media"`
+	Entity       types.String `tfsdk:"entity"`
+	Limit        types.Int64  `tfsdk:"limit"`
+	Results      types.List   `tfsdk:"results"`
 }
 
 // NewContentDataSource creates a new instance of the content data source.
@@ -74,21 +71,23 @@ func (d *contentDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 	resp.Schema = schema.Schema{
 		Description: "Search for, or lookup content in the iTunes Store.",
 		Attributes: map[string]schema.Attribute{
-			"app_store_url": schema.StringAttribute{
+			"app_store_urls": schema.ListAttribute{
 				Optional:    true,
-				Description: "App Store URL (e.g., https://apps.apple.com/gb/app/facebook/id284882215). Mutually exclusive with term and id.",
+				ElementType: types.StringType,
+				Description: "List of App Store URLs. Mutually exclusive with term and ids.",
 			},
 			"term": schema.StringAttribute{
 				Optional:    true,
 				Description: "Search term (e.g. app name). Mutually exclusive with id.",
 			},
-			"id": schema.Int64Attribute{
+			"ids": schema.ListAttribute{
 				Optional:    true,
-				Description: "iTunes ID to look up specific content. Mutually exclusive with term.",
+				ElementType: types.Int64Type,
+				Description: "List of iTunes IDs to look up specific content. Mutually exclusive with term.",
 			},
 			"country": schema.StringAttribute{
 				Optional:    true,
-				Description: "ISO 2-letter country code. See http://en.wikipedia.org/wiki/ ISO_3166-1_alpha-2 for a list of ISO Country Codes.",
+				Description: "ISO 2-letter country code. See http://en.wikipedia.org/wiki/ISO_3166-1_alpha-2 for a list of ISO Country Codes.",
 			},
 			"media": schema.StringAttribute{
 				Optional:    true,
@@ -96,11 +95,11 @@ func (d *contentDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 			},
 			"entity": schema.StringAttribute{
 				Optional:    true,
-				Description: "The type of results you want returned, relative to the specified media type. For example: movieArtist for a movie media type search. The default is the track entity associated with the specified media type.",
+				Description: "The type of results you want returned, relative to the specified media type.",
 			},
 			"limit": schema.Int64Attribute{
 				Optional:    true,
-				Description: "Maximum number of results when searching by term.",
+				Description: "Maximum number of results.",
 			},
 			"results": schema.ListAttribute{
 				Computed:    true,
@@ -111,106 +110,6 @@ func (d *contentDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 			},
 		},
 	}
-}
-
-// getString retrieves a string value from a map by key, converting it to a string if necessary.
-func getString(m map[string]interface{}, key string) string {
-	if v, ok := m[key]; ok && v != nil {
-		return fmt.Sprintf("%v", v)
-	}
-	return ""
-}
-
-// getFloat64 retrieves a float64 value from a map by key, handling both float64 and int types.
-func getFloat64(m map[string]interface{}, key string) float64 {
-	if v, ok := m[key]; ok {
-		switch val := v.(type) {
-		case float64:
-			return val
-		case int:
-			return float64(val)
-		}
-	}
-	return 0
-}
-
-// getInt64 retrieves an int64 value from a map by key, handling both float64 and int types.
-func getInt64(m map[string]interface{}, key string) int64 {
-	if v, ok := m[key]; ok {
-		switch val := v.(type) {
-		case float64:
-			return int64(val)
-		case int:
-			return int64(val)
-		}
-	}
-	return 0
-}
-
-// getStringList retrieves a list of strings from a map by key.
-func getStringList(m map[string]interface{}, key string) []attr.Value {
-	var list []attr.Value
-	if v, ok := m[key]; ok {
-		if arr, ok := v.([]interface{}); ok {
-			for _, elem := range arr {
-				list = append(list, types.StringValue(fmt.Sprintf("%v", elem)))
-			}
-		}
-	}
-	return list
-}
-
-// addCommonParameters adds common query parameters to the URL query.
-func addCommonParameters(query url.Values, data *contentDataSourceModel) {
-	if !data.Entity.IsNull() {
-		query.Set("entity", data.Entity.ValueString())
-	}
-	if !data.Country.IsNull() {
-		query.Set("country", data.Country.ValueString())
-	}
-	if !data.Limit.IsNull() {
-		query.Set("limit", fmt.Sprintf("%d", data.Limit.ValueInt64()))
-	}
-}
-
-// parseAppStoreURL parses an App Store URL and extracts the track ID and country code.
-func parseAppStoreURL(urlStr string) (trackID int64, countryCode string, err error) {
-	parsedURL, err := url.Parse(urlStr)
-	if err != nil {
-		return 0, "", fmt.Errorf("invalid URL format: %v", err)
-	}
-
-	if parsedURL.Host != "apps.apple.com" {
-		return 0, "", fmt.Errorf("URL must be from apps.apple.com")
-	}
-
-	parts := strings.Split(strings.Trim(parsedURL.Path, "/"), "/")
-	if len(parts) < 4 {
-		return 0, "", fmt.Errorf("invalid App Store URL format")
-	}
-
-	countryCode = parts[0]
-	if len(countryCode) != 2 {
-		return 0, "", fmt.Errorf("invalid country code in URL")
-	}
-
-	idPart := parts[len(parts)-1]
-	idStr := idPart
-
-	if strings.Contains(idPart, "?") {
-		idStr = strings.Split(idPart, "?")[0]
-	}
-
-	if !strings.HasPrefix(idStr, "id") {
-		return 0, "", fmt.Errorf("invalid track ID format in URL")
-	}
-
-	trackID, err = strconv.ParseInt(strings.TrimPrefix(idStr, "id"), 10, 64)
-	if err != nil {
-		return 0, "", fmt.Errorf("invalid track ID number: %v", err)
-	}
-
-	return trackID, countryCode, nil
 }
 
 // Read implements the datasource.Read method for the content data source.
@@ -226,76 +125,107 @@ func (d *contentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	if !data.Term.IsNull() {
 		paramCount++
 	}
-	if !data.ID.IsNull() {
+	if !data.IDs.IsNull() {
 		paramCount++
 	}
-	if !data.AppStoreURL.IsNull() {
+	if !data.AppStoreURLs.IsNull() {
 		paramCount++
 	}
 
 	if paramCount != 1 {
 		resp.Diagnostics.AddError(
 			"Invalid Input",
-			"You must provide exactly one of: 'term', 'id', or 'app_store_url'.",
+			"You must provide exactly one of: 'term', 'ids', or 'app_store_urls'.",
 		)
 		return
 	}
 
-	var apiURL string
-	if !data.AppStoreURL.IsNull() {
-		trackID, countryCode, err := parseAppStoreURL(data.AppStoreURL.ValueString())
-		if err != nil {
-			resp.Diagnostics.AddError("Invalid App Store URL", err.Error())
+	var results []client.ContentResult
+
+	if !data.AppStoreURLs.IsNull() {
+		var urls []string
+		diags = data.AppStoreURLs.ElementsAs(ctx, &urls, false)
+		if diags.HasError() {
+			resp.Diagnostics.Append(diags...)
 			return
 		}
 
-		data.ID = types.Int64Value(trackID)
+		var trackIDs []int64
+		countryCode := ""
+
+		for _, urlStr := range urls {
+			trackID, country, err := d.client.ParseAppStoreURL(urlStr)
+			if err != nil {
+				resp.Diagnostics.AddError("Invalid App Store URL", err.Error())
+				return
+			}
+
+			if countryCode == "" {
+				countryCode = country
+			} else if countryCode != country {
+				resp.Diagnostics.AddError(
+					"Inconsistent Countries",
+					"All App Store URLs must be from the same country store.",
+				)
+				return
+			}
+
+			trackIDs = append(trackIDs, trackID)
+		}
+
 		data.Country = types.StringValue(countryCode)
 
-		query := url.Values{}
-		query.Set("id", fmt.Sprintf("%d", trackID))
-		addCommonParameters(query, &data)
-		apiURL = fmt.Sprintf("https://itunes.apple.com/lookup?%s", query.Encode())
-	} else if !data.ID.IsNull() {
-		query := url.Values{}
-		query.Set("id", fmt.Sprintf("%d", data.ID.ValueInt64()))
-		addCommonParameters(query, &data)
-		apiURL = fmt.Sprintf("https://itunes.apple.com/lookup?%s", query.Encode())
+		batches := d.client.ChunkIDs(trackIDs)
+		for _, batch := range batches {
+			result, err := d.client.ProcessBatch(ctx, batch,
+				data.Entity.ValueString(),
+				data.Country.ValueString(),
+				data.Limit.ValueInt64())
+			if err != nil {
+				resp.Diagnostics.AddError("API Request Failed", err.Error())
+				return
+			}
+			results = append(results, result.Results...)
+		}
+
+	} else if !data.IDs.IsNull() {
+		var ids []int64
+		diags = data.IDs.ElementsAs(ctx, &ids, false)
+		if diags.HasError() {
+			resp.Diagnostics.Append(diags...)
+			return
+		}
+
+		batches := d.client.ChunkIDs(ids)
+		for _, batch := range batches {
+			result, err := d.client.ProcessBatch(ctx, batch,
+				data.Entity.ValueString(),
+				data.Country.ValueString(),
+				data.Limit.ValueInt64())
+			if err != nil {
+				resp.Diagnostics.AddError("API Request Failed", err.Error())
+				return
+			}
+			results = append(results, result.Results...)
+		}
+
 	} else {
-		query := url.Values{}
-		query.Set("term", data.Term.ValueString())
-		if !data.Media.IsNull() {
-			query.Set("media", data.Media.ValueString())
-		} else {
-			query.Set("media", "all")
+		result, err := d.client.Search(ctx,
+			data.Term.ValueString(),
+			data.Media.ValueString(),
+			data.Entity.ValueString(),
+			data.Country.ValueString(),
+			data.Limit.ValueInt64())
+		if err != nil {
+			resp.Diagnostics.AddError("API Request Failed", err.Error())
+			return
 		}
-		addCommonParameters(query, &data)
-		apiURL = fmt.Sprintf("https://itunes.apple.com/search?%s", query.Encode())
-	}
-
-	httpResp, err := d.client.DoRateLimitedRequest(ctx, apiURL)
-	if err != nil {
-		resp.Diagnostics.AddError("API request failed", err.Error())
-		return
-	}
-	defer func() {
-		if err := httpResp.Body.Close(); err != nil {
-			fmt.Printf("warning: failed to close response body: %v\n", err)
-		}
-	}()
-
-	var apiResp struct {
-		Results []map[string]interface{} `json:"results"`
-	}
-
-	if err := json.NewDecoder(httpResp.Body).Decode(&apiResp); err != nil {
-		resp.Diagnostics.AddError("Error decoding API response", err.Error())
-		return
+		results = result.Results
 	}
 
 	var resultItems []attr.Value
-	for _, item := range apiResp.Results {
-		artworkURL := getString(item, "artworkUrl512")
+	for _, result := range results {
+		artworkURL := result.ArtworkURL
 		if artworkURL != "" && strings.HasSuffix(artworkURL, ".jpg") {
 			artworkURL = strings.TrimSuffix(artworkURL, ".jpg") + ".png"
 		}
@@ -304,36 +234,37 @@ func (d *contentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		if artworkURL != "" {
 			encoded, err := d.client.DownloadAndEncodeImage(ctx, artworkURL)
 			if err != nil {
-				fmt.Printf("Warning: Failed to download artwork for %s: %v\n", getString(item, "trackName"), err)
+				fmt.Printf("Warning: Failed to download artwork for %s: %v\n",
+					result.TrackName, err)
 			} else {
 				artworkBase64 = encoded
 			}
 		}
 
 		attrs := map[string]attr.Value{
-			"track_name":         types.StringValue(getString(item, "trackName")),
-			"bundle_id":          types.StringValue(getString(item, "bundleId")),
-			"track_id":           types.Int64Value(getInt64(item, "trackId")),
-			"seller_name":        types.StringValue(getString(item, "sellerName")),
-			"kind":               types.StringValue(getString(item, "kind")),
-			"description":        types.StringValue(getString(item, "description")),
-			"release_date":       types.StringValue(getString(item, "releaseDate")),
-			"price":              types.Float64Value(getFloat64(item, "price")),
-			"formatted_price":    types.StringValue(getString(item, "formattedPrice")),
-			"currency":           types.StringValue(getString(item, "currency")),
-			"version":            types.StringValue(getString(item, "version")),
-			"primary_genre":      types.StringValue(getString(item, "primaryGenreName")),
-			"minimum_os_version": types.StringValue(getString(item, "minimumOsVersion")),
-			"file_size_bytes":    types.Int64Value(getInt64(item, "fileSizeBytes")),
-			"artist_view_url":    types.StringValue(getString(item, "artistViewUrl")),
-			"artwork_url":        types.StringValue(getString(item, "artworkUrl512")),
+			"track_name":         types.StringValue(result.TrackName),
+			"bundle_id":          types.StringValue(result.BundleID),
+			"track_id":           types.Int64Value(result.TrackID),
+			"seller_name":        types.StringValue(result.SellerName),
+			"kind":               types.StringValue(result.Kind),
+			"description":        types.StringValue(result.Description),
+			"release_date":       types.StringValue(result.ReleaseDate),
+			"price":              types.Float64Value(result.Price),
+			"formatted_price":    types.StringValue(result.FormattedPrice),
+			"currency":           types.StringValue(result.Currency),
+			"version":            types.StringValue(result.Version),
+			"primary_genre":      types.StringValue(result.PrimaryGenre),
+			"minimum_os_version": types.StringValue(result.MinimumOSVersion),
+			"file_size_bytes":    types.StringValue(result.FileSizeBytes),
+			"artist_view_url":    types.StringValue(result.ArtistViewURL),
+			"artwork_url":        types.StringValue(artworkURL),
 			"artwork_base64":     types.StringValue(artworkBase64),
-			"track_view_url":     types.StringValue(getString(item, "trackViewUrl")),
-			"supported_devices":  types.ListValueMust(types.StringType, getStringList(item, "supportedDevices")),
-			"genres":             types.ListValueMust(types.StringType, getStringList(item, "genres")),
-			"languages":          types.ListValueMust(types.StringType, getStringList(item, "languageCodesISO2A")),
-			"average_rating":     types.Float64Value(getFloat64(item, "averageUserRating")),
-			"rating_count":       types.Int64Value(getInt64(item, "userRatingCount")),
+			"track_view_url":     types.StringValue(result.TrackViewURL),
+			"supported_devices":  types.ListValueMust(types.StringType, convertToAttrValues(result.SupportedDevices)),
+			"genres":             types.ListValueMust(types.StringType, convertToAttrValues(result.Genres)),
+			"languages":          types.ListValueMust(types.StringType, convertToAttrValues(result.Languages)),
+			"average_rating":     types.Float64Value(result.AverageRating),
+			"rating_count":       types.Int64Value(result.RatingCount),
 		}
 
 		obj, diags := types.ObjectValue(contentAttributeTypes, attrs)
@@ -353,4 +284,13 @@ func (d *contentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	resp.Diagnostics.Append(diags...)
 
 	resp.State.Set(ctx, &data)
+}
+
+// Helper function to convert string slice to attr.Value slice
+func convertToAttrValues(strings []string) []attr.Value {
+	values := make([]attr.Value, len(strings))
+	for i, s := range strings {
+		values[i] = types.StringValue(s)
+	}
+	return values
 }
