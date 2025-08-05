@@ -3,7 +3,7 @@ module github.com/neilmartin83/terraform-provider-itunessearchapi
 go 1.24.5
 
 require (
-	github.com/hashicorp/terraform-plugin-framework v1.15.0
+	github.com/hashicorp/terraform-plugin-framework v1.15.1
 	golang.org/x/time v0.12.0
 )
 
