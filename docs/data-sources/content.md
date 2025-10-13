@@ -83,7 +83,7 @@ Read-Only:
 - `bundle_id` (String)
 - `currency` (String)
 - `description` (String)
-- `file_size_bytes` (Number)
+- `file_size_bytes` (String)
 - `formatted_price` (String)
 - `genres` (List of String)
 - `kind` (String)
