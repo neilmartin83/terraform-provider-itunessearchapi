@@ -1,6 +1,6 @@
 module github.com/neilmartin83/terraform-provider-itunessearchapi
 
-go 1.25.1
+go 1.25.2
 
 require (
 	github.com/hashicorp/terraform-plugin-framework v1.16.1
