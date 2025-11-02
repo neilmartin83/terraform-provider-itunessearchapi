@@ -60,42 +60,42 @@ output "lookup_results" {
 ### Optional
 
 - `app_store_urls` (List of String) List of App Store URLs. Mutually exclusive with term and ids.
-- `country` (String) ISO 2-letter country code. See http://en.wikipedia.org/wiki/ISO_3166-1_alpha-2 for a list of ISO Country Codes.
+- `country` (String) ISO 2-letter country code (lowercase). See http://en.wikipedia.org/wiki/ISO_3166-1_alpha-2 for a list of ISO Country Codes.
 - `entity` (String) The type of results you want returned, relative to the specified media type.
-- `ids` (List of Number) List of iTunes IDs to look up specific content. Mutually exclusive with term.
+- `ids` (List of Number) List of iTunes IDs to look up specific content. Mutually exclusive with app_store_urls and term.
 - `limit` (Number) Maximum number of results.
 - `media` (String) Media type, defaults to 'all'. Supported values: 'movie', 'podcast', 'music', 'musicVideo', 'audiobook', 'shortFilm', 'tvShow', 'software', 'ebook', 'all'
-- `term` (String) Search term (e.g. app name). Mutually exclusive with id.
+- `term` (String) Search term (e.g. app name). Mutually exclusive with app_store_urls and ids.
 
 ### Read-Only
 
-- `results` (List of Object) List of content search results. (see [below for nested schema](#nestedatt--results))
+- `results` (Attributes List) List of content search results. (see [below for nested schema](#nestedatt--results))
 
 <a id="nestedatt--results"></a>
 ### Nested Schema for `results`
 
 Read-Only:
 
-- `artist_view_url` (String)
-- `artwork_base64` (String)
-- `artwork_url` (String)
-- `average_rating` (Number)
-- `bundle_id` (String)
-- `currency` (String)
-- `description` (String)
-- `file_size_bytes` (String)
-- `formatted_price` (String)
-- `genres` (List of String)
-- `kind` (String)
-- `languages` (List of String)
-- `minimum_os_version` (String)
-- `price` (Number)
-- `primary_genre` (String)
-- `rating_count` (Number)
-- `release_date` (String)
-- `seller_name` (String)
-- `supported_devices` (List of String)
-- `track_id` (Number)
-- `track_name` (String)
-- `track_view_url` (String)
-- `version` (String)
+- `artist_view_url` (String) URL to artist view.
+- `artwork_base64` (String) Base64-encoded artwork image.
+- `artwork_url` (String) Artwork URL.
+- `average_rating` (Number) Average user rating.
+- `bundle_id` (String) Bundle ID for apps.
+- `currency` (String) Currency code.
+- `description` (String) Description of the content.
+- `file_size_bytes` (String) File size in bytes.
+- `formatted_price` (String) Formatted price string.
+- `genres` (List of String) List of genres.
+- `kind` (String) Kind of content (e.g., software, ebook).
+- `languages` (List of String) List of supported languages.
+- `minimum_os_version` (String) Minimum OS version required.
+- `price` (Number) Price.
+- `primary_genre` (String) Primary genre.
+- `rating_count` (Number) Number of ratings.
+- `release_date` (String) Release date.
+- `seller_name` (String) Name of the seller.
+- `supported_devices` (List of String) List of supported devices.
+- `track_id` (Number) iTunes track ID.
+- `track_name` (String) Name of the track.
+- `track_view_url` (String) URL to track view.
+- `version` (String) Current version.
