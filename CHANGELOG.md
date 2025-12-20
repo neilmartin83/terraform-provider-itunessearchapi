@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.0](https://github.com/neilmartin83/terraform-provider-itunessearchapi/compare/v1.9.2...v1.10.0) (2025-12-20)
+
+
+### Features
+
+* add timeouts support to content data source ([#26](https://github.com/neilmartin83/terraform-provider-itunessearchapi/issues/26)) ([ccef6e4](https://github.com/neilmartin83/terraform-provider-itunessearchapi/commit/ccef6e445f983cb83cc7c0dd47c84ce47bf04afd))
+
 ## [1.9.0](https://github.com/neilmartin83/terraform-provider-itunessearchapi/compare/v1.8.5...v1.9.0) (2025-11-02)
 
 
