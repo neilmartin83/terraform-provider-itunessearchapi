@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -26,6 +27,8 @@ import (
 
 var _ datasource.DataSource = &ContentDataSource{}
 
+const defaultReadTimeout = 90 * time.Second
+
 func NewContentDataSource() datasource.DataSource {
 	return &ContentDataSource{}
 }
@@ -37,6 +40,7 @@ type ContentDataSource struct {
 
 // ContentDataSourceModel describes the data source data model.
 type ContentDataSourceModel struct {
+	Timeouts     timeouts.Value       `tfsdk:"timeouts"`
 	AppStoreURLs types.List           `tfsdk:"app_store_urls"`
 	Term         types.String         `tfsdk:"term"`
 	IDs          types.List           `tfsdk:"ids"`
@@ -82,6 +86,7 @@ func (d *ContentDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 	resp.Schema = schema.Schema{
 		Description: "Search for, or lookup content in the iTunes Store.",
 		Attributes: map[string]schema.Attribute{
+			"timeouts": timeouts.Attributes(ctx),
 			"app_store_urls": schema.ListAttribute{
 				Optional:    true,
 				ElementType: types.StringType,
@@ -323,6 +328,19 @@ func (d *ContentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
+	readTimeout := defaultReadTimeout
+	if !data.Timeouts.IsNull() && !data.Timeouts.IsUnknown() {
+		configuredTimeout, timeoutDiags := data.Timeouts.Read(ctx, defaultReadTimeout)
+		resp.Diagnostics.Append(timeoutDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		readTimeout = configuredTimeout
+	}
+
+	readCtx, cancel := context.WithTimeout(ctx, readTimeout)
+	defer cancel()
+
 	var results []client.ContentResult
 
 	if !data.AppStoreURLs.IsNull() {
@@ -356,7 +374,7 @@ func (d *ContentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 
 		batches := chunkIDs(trackIDs)
 		for _, batch := range batches {
-			result, err := d.client.Lookup(ctx, batch,
+			result, err := d.client.Lookup(readCtx, batch,
 				data.Entity.ValueString(),
 				data.Country.ValueString(),
 				data.Limit.ValueInt64())
@@ -396,7 +414,7 @@ func (d *ContentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		var allMissingIDs []int64
 		batches := chunkIDs(ids)
 		for _, batch := range batches {
-			result, err := d.client.Lookup(ctx, batch,
+			result, err := d.client.Lookup(readCtx, batch,
 				data.Entity.ValueString(),
 				data.Country.ValueString(),
 				data.Limit.ValueInt64())
@@ -421,7 +439,7 @@ func (d *ContentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		}
 
 	} else {
-		result, err := d.client.Search(ctx,
+		result, err := d.client.Search(readCtx,
 			data.Term.ValueString(),
 			data.Media.ValueString(),
 			data.Entity.ValueString(),
@@ -443,7 +461,7 @@ func (d *ContentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 
 		var artworkBase64 string
 		if artworkURL != "" {
-			encoded, err := downloadAndEncodeImage(ctx, artworkURL)
+			encoded, err := downloadAndEncodeImage(readCtx, artworkURL)
 			if err != nil {
 				tflog.Warn(ctx, "Failed to download artwork", map[string]interface{}{
 					"track_name": result.TrackName,
