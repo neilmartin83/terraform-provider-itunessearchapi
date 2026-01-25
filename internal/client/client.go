@@ -124,6 +124,36 @@ type ContentResult struct {
 	RatingCount      int64    `json:"userRatingCount"`
 }
 
+// LookupRequest captures the supported query parameters for lookup operations.
+type LookupRequest struct {
+	IDs          []int64
+	AMGArtistIDs []int64
+	AMGAlbumIDs  []int64
+	AMGVideoIDs  []int64
+	UPCs         []string
+	ISBNs        []string
+	BundleIDs    []string
+	Entity       string
+	Country      string
+	Limit        int64
+	Sort         string
+}
+
+// SearchRequest captures the supported query parameters for search operations.
+type SearchRequest struct {
+	Term      string
+	Media     string
+	Entity    string
+	Country   string
+	Attribute string
+	Limit     int64
+	Lang      string
+	Version   int64
+	Explicit  *bool
+	Offset    *int64
+	Callback  string
+}
+
 const (
 	maxLookupBatchSize = 200
 	rateLimitRequests  = 20
@@ -158,12 +188,54 @@ func (e *NotFoundError) Error() string {
 	return fmt.Sprintf("The following URLs were not found: %v", e.MissingURLs)
 }
 
-// Lookup looks up a batch of IDs and returns the results.
-func (c *Client) Lookup(ctx context.Context, ids []int64, entity, country string, limit int64) (*ContentResponse, error) {
+// Lookup issues a lookup request using the provided selectors and returns the results.
+func (c *Client) Lookup(ctx context.Context, req LookupRequest) (*ContentResponse, error) {
 	query := url.Values{}
-	query.Set("id", strings.Join(c.stringifyIDs(ids), ","))
-	query.Set("limit", strconv.Itoa(maxLookupBatchSize))
-	c.addCommonParameters(query, entity, country, limit)
+	selectorSet := false
+
+	if len(req.IDs) > 0 {
+		query.Set("id", strings.Join(c.stringifyIDs(req.IDs), ","))
+		selectorSet = true
+	}
+	if len(req.AMGArtistIDs) > 0 {
+		query.Set("amgArtistId", strings.Join(c.stringifyIDs(req.AMGArtistIDs), ","))
+		selectorSet = true
+	}
+	if len(req.AMGAlbumIDs) > 0 {
+		query.Set("amgAlbumId", strings.Join(c.stringifyIDs(req.AMGAlbumIDs), ","))
+		selectorSet = true
+	}
+	if len(req.AMGVideoIDs) > 0 {
+		query.Set("amgVideoId", strings.Join(c.stringifyIDs(req.AMGVideoIDs), ","))
+		selectorSet = true
+	}
+	if len(req.UPCs) > 0 {
+		query.Set("upc", strings.Join(req.UPCs, ","))
+		selectorSet = true
+	}
+	if len(req.ISBNs) > 0 {
+		query.Set("isbn", strings.Join(req.ISBNs, ","))
+		selectorSet = true
+	}
+	if len(req.BundleIDs) > 0 {
+		query.Set("bundleId", strings.Join(req.BundleIDs, ","))
+		selectorSet = true
+	}
+
+	if !selectorSet {
+		return nil, fmt.Errorf("lookup requires at least one selector parameter")
+	}
+
+	limitToUse := req.Limit
+	if limitToUse > maxLookupBatchSize {
+		limitToUse = maxLookupBatchSize
+	}
+
+	c.addCommonParameters(query, req.Entity, req.Country, limitToUse)
+
+	if req.Sort != "" {
+		query.Set("sort", req.Sort)
+	}
 
 	apiURL := fmt.Sprintf("https://itunes.apple.com/lookup?%s", query.Encode())
 
@@ -182,13 +254,17 @@ func (c *Client) Lookup(ctx context.Context, ids []int64, entity, country string
 		return nil, fmt.Errorf("error decoding API response: %w", err)
 	}
 
+	if len(req.IDs) == 0 {
+		return &result, nil
+	}
+
 	foundIDs := make(map[int64]bool)
 	for _, item := range result.Results {
 		foundIDs[item.TrackID] = true
 	}
 
 	var missingIDs []int64
-	for _, id := range ids {
+	for _, id := range req.IDs {
 		if !foundIDs[id] {
 			missingIDs = append(missingIDs, id)
 		}
@@ -227,16 +303,39 @@ func (c *Client) Lookup(ctx context.Context, ids []int64, entity, country string
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
-func (c *Client) Search(ctx context.Context, term, media, entity, country string, limit int64) (*ContentResponse, error) {
+func (c *Client) Search(ctx context.Context, req SearchRequest) (*ContentResponse, error) {
 	query := url.Values{}
-	query.Set("term", term)
-	if media != "" {
-		query.Set("media", media)
+	query.Set("term", req.Term)
+	if req.Media != "" {
+		query.Set("media", req.Media)
 	} else {
 		query.Set("media", "all")
 	}
 
-	c.addCommonParameters(query, entity, country, limit)
+	c.addCommonParameters(query, req.Entity, req.Country, req.Limit)
+
+	if req.Attribute != "" {
+		query.Set("attribute", req.Attribute)
+	}
+	if req.Lang != "" {
+		query.Set("lang", req.Lang)
+	}
+	if req.Version > 0 {
+		query.Set("version", fmt.Sprintf("%d", req.Version))
+	}
+	if req.Explicit != nil {
+		if *req.Explicit {
+			query.Set("explicit", "Yes")
+		} else {
+			query.Set("explicit", "No")
+		}
+	}
+	if req.Offset != nil {
+		query.Set("offset", fmt.Sprintf("%d", *req.Offset))
+	}
+	if req.Callback != "" {
+		query.Set("callback", req.Callback)
+	}
 
 	apiURL := fmt.Sprintf("https://itunes.apple.com/search?%s", query.Encode())
 
@@ -250,8 +349,21 @@ func (c *Client) Search(ctx context.Context, term, media, entity, country string
 		}
 	}()
 
+	var decoder io.Reader = resp.Body
+	if req.Callback != "" {
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("error reading callback response: %w", err)
+		}
+		payload, err := unwrapJSONPBody(bodyBytes, req.Callback)
+		if err != nil {
+			return nil, err
+		}
+		decoder = bytes.NewReader(payload)
+	}
+
 	var result ContentResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.NewDecoder(decoder).Decode(&result); err != nil {
 		return nil, fmt.Errorf("error decoding API response: %w", err)
 	}
 
@@ -260,7 +372,6 @@ func (c *Client) Search(ctx context.Context, term, media, entity, country string
 
 // doRequest performs an HTTP GET request to the specified URL.
 func (c *Client) doRequest(ctx context.Context, url string) (*http.Response, error) {
-	// Apply client-side rate limiting
 	if err := c.rateLimiter.take(ctx); err != nil {
 		return nil, fmt.Errorf("rate limiter error: %w", err)
 	}
@@ -363,4 +474,16 @@ func (c *Client) stringifyIDs(ids []int64) []string {
 		strIDs[i] = strconv.FormatInt(id, 10)
 	}
 	return strIDs
+}
+
+// unwrapJSONPBody strips the callback wrapper from a JSONP response.
+func unwrapJSONPBody(body []byte, callback string) ([]byte, error) {
+	trimmed := bytes.TrimSpace(body)
+	trimmed = bytes.TrimSuffix(trimmed, []byte(";"))
+	prefix := []byte(callback + "(")
+	suffix := []byte(")")
+	if !bytes.HasPrefix(trimmed, prefix) || !bytes.HasSuffix(trimmed, suffix) {
+		return nil, fmt.Errorf("unexpected JSONP response format")
+	}
+	return trimmed[len(prefix) : len(trimmed)-len(suffix)], nil
 }
