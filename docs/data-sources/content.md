@@ -59,14 +59,27 @@ output "lookup_results" {
 
 ### Optional
 
-- `app_store_urls` (List of String) List of App Store URLs. Mutually exclusive with term and ids.
+- `amg_album_ids` (List of Number) List of AMG album IDs for lookup requests.
+- `amg_artist_ids` (List of Number) List of AMG artist IDs for lookup requests.
+- `amg_video_ids` (List of Number) List of AMG video IDs for lookup requests.
+- `app_store_urls` (List of String) List of App Store URLs. Mutually exclusive with all other selectors.
+- `attribute` (String) Search attribute that constrains which field Apple matches against your term (for example, songTerm, albumTerm, titleTerm).
+- `bundle_ids` (List of String) List of application bundle IDs for lookup requests.
+- `callback` (String) Optional JavaScript callback name for JSONP search responses. Terraform automatically unwraps the callback when decoding.
 - `country` (String) ISO 2-letter country code (lowercase). See http://en.wikipedia.org/wiki/ISO_3166-1_alpha-2 for a list of ISO Country Codes.
 - `entity` (String) The type of results you want returned, relative to the specified media type. Supported values: 'movieArtist', 'movie', 'podcastAuthor', 'podcast', 'podcastEpisode', 'musicArtist', 'musicTrack', 'album', 'musicVideo', 'mix', 'song', 'audiobookAuthor', 'audiobook', 'shortFilmArtist', 'shortFilm', 'tvEpisode', 'tvSeason', 'software', 'iPadSoftware', 'desktopSoftware', 'ebook', 'allArtist', 'allTrack'. See the iTunes Search API documentation for more details.
-- `ids` (List of Number) List of iTunes IDs to look up specific content. Mutually exclusive with app_store_urls and term.
-- `limit` (Number) Maximum number of results to return when performing term-based searches. Lookup requests automatically align the limit with the number of App Store URLs or IDs you provide. Valid range is 1-200.
+- `explicit` (Boolean) Whether to include explicit content in search results. Defaults to true when unset.
+- `ids` (List of Number) List of iTunes IDs to look up specific content. Mutually exclusive with all other selectors.
+- `isbns` (List of String) List of ISBN codes for lookup requests.
+- `lang` (String) Language for the returned results (en_us or ja_jp).
+- `limit` (Number) Maximum number of results to return. For lookups, this overrides the provider-managed defaults when you need to limit nested collections (for example, top 5 albums per artist). Valid range is 1-200.
 - `media` (String) Media type, defaults to 'all'. Supported values: 'movie', 'podcast', 'music', 'musicVideo', 'audiobook', 'shortFilm', 'tvShow', 'software', 'ebook', 'all'. See the iTunes Search API documentation for more details.
-- `term` (String) Search term (e.g. app name). Mutually exclusive with app_store_urls and ids.
+- `offset` (Number) Result offset for paginating term-based searches.
+- `sort` (String) Sort order for lookup results when supported by the API (amg_artist_ids lookups). Allowed values: popular, recent.
+- `term` (String) Search term (e.g. app name). Mutually exclusive with lookup identifiers.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
+- `upcs` (List of String) List of UPC/EAN codes for lookup requests.
+- `version` (Number) Search result key version to request from Apple (1 or 2).
 
 ### Read-Only
 

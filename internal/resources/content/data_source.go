@@ -44,10 +44,23 @@ type ContentDataSourceModel struct {
 	AppStoreURLs types.List           `tfsdk:"app_store_urls"`
 	Term         types.String         `tfsdk:"term"`
 	IDs          types.List           `tfsdk:"ids"`
+	AMGArtistIDs types.List           `tfsdk:"amg_artist_ids"`
+	AMGAlbumIDs  types.List           `tfsdk:"amg_album_ids"`
+	AMGVideoIDs  types.List           `tfsdk:"amg_video_ids"`
+	UPCs         types.List           `tfsdk:"upcs"`
+	ISBNs        types.List           `tfsdk:"isbns"`
+	BundleIDs    types.List           `tfsdk:"bundle_ids"`
 	Country      types.String         `tfsdk:"country"`
 	Media        types.String         `tfsdk:"media"`
 	Entity       types.String         `tfsdk:"entity"`
 	Limit        types.Int64          `tfsdk:"limit"`
+	Sort         types.String         `tfsdk:"sort"`
+	Attribute    types.String         `tfsdk:"attribute"`
+	Lang         types.String         `tfsdk:"lang"`
+	Version      types.Int64          `tfsdk:"version"`
+	Explicit     types.Bool           `tfsdk:"explicit"`
+	Offset       types.Int64          `tfsdk:"offset"`
+	Callback     types.String         `tfsdk:"callback"`
 	Results      []ContentResultModel `tfsdk:"results"`
 }
 
@@ -90,11 +103,17 @@ func (d *ContentDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 			"app_store_urls": schema.ListAttribute{
 				Optional:            true,
 				ElementType:         types.StringType,
-				MarkdownDescription: "List of App Store URLs. Mutually exclusive with term and ids.",
+				MarkdownDescription: "List of App Store URLs. Mutually exclusive with all other selectors.",
 				Validators: []validator.List{
 					listvalidator.ExactlyOneOf(
 						path.MatchRelative().AtParent().AtName("term"),
 						path.MatchRelative().AtParent().AtName("ids"),
+						path.MatchRelative().AtParent().AtName("amg_artist_ids"),
+						path.MatchRelative().AtParent().AtName("amg_album_ids"),
+						path.MatchRelative().AtParent().AtName("amg_video_ids"),
+						path.MatchRelative().AtParent().AtName("upcs"),
+						path.MatchRelative().AtParent().AtName("isbns"),
+						path.MatchRelative().AtParent().AtName("bundle_ids"),
 					),
 					listvalidator.ValueStringsAre(
 						stringvalidator.RegexMatches(regexp.MustCompile(`^https://apps\.apple\.com/([a-z]{2})/.*?/id(\d+)`),
@@ -104,22 +123,152 @@ func (d *ContentDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 			},
 			"term": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: "Search term (e.g. app name). Mutually exclusive with app_store_urls and ids.",
+				MarkdownDescription: "Search term (e.g. app name). Mutually exclusive with lookup identifiers.",
 				Validators: []validator.String{
 					stringvalidator.ExactlyOneOf(
 						path.MatchRoot("app_store_urls"),
 						path.MatchRoot("ids"),
+						path.MatchRoot("amg_artist_ids"),
+						path.MatchRoot("amg_album_ids"),
+						path.MatchRoot("amg_video_ids"),
+						path.MatchRoot("upcs"),
+						path.MatchRoot("isbns"),
+						path.MatchRoot("bundle_ids"),
 					),
 				},
 			},
 			"ids": schema.ListAttribute{
 				Optional:            true,
 				ElementType:         types.Int64Type,
-				MarkdownDescription: "List of iTunes IDs to look up specific content. Mutually exclusive with app_store_urls and term.",
+				MarkdownDescription: "List of iTunes IDs to look up specific content. Mutually exclusive with all other selectors.",
 				Validators: []validator.List{
 					listvalidator.ExactlyOneOf(
 						path.MatchRoot("app_store_urls"),
 						path.MatchRoot("term"),
+						path.MatchRoot("amg_artist_ids"),
+						path.MatchRoot("amg_album_ids"),
+						path.MatchRoot("amg_video_ids"),
+						path.MatchRoot("upcs"),
+						path.MatchRoot("isbns"),
+						path.MatchRoot("bundle_ids"),
+					),
+				},
+			},
+			"amg_artist_ids": schema.ListAttribute{
+				Optional:            true,
+				ElementType:         types.Int64Type,
+				MarkdownDescription: "List of AMG artist IDs for lookup requests.",
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+					listvalidator.ExactlyOneOf(
+						path.MatchRoot("app_store_urls"),
+						path.MatchRoot("term"),
+						path.MatchRoot("ids"),
+						path.MatchRoot("amg_album_ids"),
+						path.MatchRoot("amg_video_ids"),
+						path.MatchRoot("upcs"),
+						path.MatchRoot("isbns"),
+						path.MatchRoot("bundle_ids"),
+					),
+				},
+			},
+			"amg_album_ids": schema.ListAttribute{
+				Optional:            true,
+				ElementType:         types.Int64Type,
+				MarkdownDescription: "List of AMG album IDs for lookup requests.",
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+					listvalidator.ExactlyOneOf(
+						path.MatchRoot("app_store_urls"),
+						path.MatchRoot("term"),
+						path.MatchRoot("ids"),
+						path.MatchRoot("amg_artist_ids"),
+						path.MatchRoot("amg_video_ids"),
+						path.MatchRoot("upcs"),
+						path.MatchRoot("isbns"),
+						path.MatchRoot("bundle_ids"),
+					),
+				},
+			},
+			"amg_video_ids": schema.ListAttribute{
+				Optional:            true,
+				ElementType:         types.Int64Type,
+				MarkdownDescription: "List of AMG video IDs for lookup requests.",
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+					listvalidator.ExactlyOneOf(
+						path.MatchRoot("app_store_urls"),
+						path.MatchRoot("term"),
+						path.MatchRoot("ids"),
+						path.MatchRoot("amg_artist_ids"),
+						path.MatchRoot("amg_album_ids"),
+						path.MatchRoot("upcs"),
+						path.MatchRoot("isbns"),
+						path.MatchRoot("bundle_ids"),
+					),
+				},
+			},
+			"upcs": schema.ListAttribute{
+				Optional:            true,
+				ElementType:         types.StringType,
+				MarkdownDescription: "List of UPC/EAN codes for lookup requests.",
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+					listvalidator.ExactlyOneOf(
+						path.MatchRoot("app_store_urls"),
+						path.MatchRoot("term"),
+						path.MatchRoot("ids"),
+						path.MatchRoot("amg_artist_ids"),
+						path.MatchRoot("amg_album_ids"),
+						path.MatchRoot("amg_video_ids"),
+						path.MatchRoot("isbns"),
+						path.MatchRoot("bundle_ids"),
+					),
+				},
+			},
+			"isbns": schema.ListAttribute{
+				Optional:            true,
+				ElementType:         types.StringType,
+				MarkdownDescription: "List of ISBN codes for lookup requests.",
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+					listvalidator.ExactlyOneOf(
+						path.MatchRoot("app_store_urls"),
+						path.MatchRoot("term"),
+						path.MatchRoot("ids"),
+						path.MatchRoot("amg_artist_ids"),
+						path.MatchRoot("amg_album_ids"),
+						path.MatchRoot("amg_video_ids"),
+						path.MatchRoot("upcs"),
+						path.MatchRoot("bundle_ids"),
+					),
+				},
+			},
+			"bundle_ids": schema.ListAttribute{
+				Optional:            true,
+				ElementType:         types.StringType,
+				MarkdownDescription: "List of application bundle IDs for lookup requests.",
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+					listvalidator.ExactlyOneOf(
+						path.MatchRoot("app_store_urls"),
+						path.MatchRoot("term"),
+						path.MatchRoot("ids"),
+						path.MatchRoot("amg_artist_ids"),
+						path.MatchRoot("amg_album_ids"),
+						path.MatchRoot("amg_video_ids"),
+						path.MatchRoot("upcs"),
+						path.MatchRoot("isbns"),
+					),
+				},
+			},
+			"sort": schema.StringAttribute{
+				Optional:            true,
+				MarkdownDescription: "Sort order for lookup results when supported by the API (amg_artist_ids lookups). Allowed values: popular, recent.",
+				Validators: []validator.String{
+					stringvalidator.OneOf("popular", "recent"),
+					stringvalidator.AlsoRequires(
+						path.MatchRoot("amg_artist_ids"),
 					),
 				},
 			},
@@ -186,13 +335,52 @@ func (d *ContentDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 					),
 				},
 			},
+			"attribute": schema.StringAttribute{
+				Optional:            true,
+				MarkdownDescription: "Search attribute that constrains which field Apple matches against your term (for example, songTerm, albumTerm, titleTerm).",
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.MatchRoot("term")),
+					stringvalidator.RegexMatches(regexp.MustCompile(`^[A-Za-z0-9]+(Term|Index)$`), "attribute names must end with Term or Index, such as songTerm or ratingIndex"),
+				},
+			},
+			"lang": schema.StringAttribute{
+				Optional:            true,
+				MarkdownDescription: "Language for the returned results (en_us or ja_jp).",
+				Validators: []validator.String{
+					stringvalidator.OneOf("en_us", "ja_jp"),
+				},
+			},
+			"version": schema.Int64Attribute{
+				Optional:            true,
+				MarkdownDescription: "Search result key version to request from Apple (1 or 2).",
+				Validators: []validator.Int64{
+					int64validator.AtLeast(1),
+					int64validator.AtMost(2),
+				},
+			},
+			"explicit": schema.BoolAttribute{
+				Optional:            true,
+				MarkdownDescription: "Whether to include explicit content in search results. Defaults to true when unset.",
+			},
+			"offset": schema.Int64Attribute{
+				Optional:            true,
+				MarkdownDescription: "Result offset for paginating term-based searches.",
+				Validators: []validator.Int64{
+					int64validator.AlsoRequires(path.MatchRoot("term")),
+					int64validator.AtLeast(0),
+				},
+			},
+			"callback": schema.StringAttribute{
+				Optional:            true,
+				MarkdownDescription: "Optional JavaScript callback name for JSONP search responses. Terraform automatically unwraps the callback when decoding.",
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.MatchRoot("term")),
+				},
+			},
 			"limit": schema.Int64Attribute{
 				Optional:            true,
-				MarkdownDescription: "Maximum number of results to return when performing term-based searches. Lookup requests automatically align the limit with the number of App Store URLs or IDs you provide. Valid range is 1-200.",
+				MarkdownDescription: "Maximum number of results to return. For lookups, this overrides the provider-managed defaults when you need to limit nested collections (for example, top 5 albums per artist). Valid range is 1-200.",
 				Validators: []validator.Int64{
-					int64validator.AlsoRequires(
-						path.MatchRoot("term"),
-					),
 					int64validator.AtLeast(1),
 					int64validator.AtMost(200),
 				},
@@ -346,7 +534,8 @@ func (d *ContentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 
 	var results []client.ContentResult
 
-	if !data.AppStoreURLs.IsNull() {
+	switch {
+	case !data.AppStoreURLs.IsNull():
 		var urls []string
 		resp.Diagnostics.Append(data.AppStoreURLs.ElementsAs(ctx, &urls, false)...)
 		if resp.Diagnostics.HasError() {
@@ -374,15 +563,14 @@ func (d *ContentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		}
 
 		data.Country = types.StringValue(countryCode)
-
-		batches := chunkIDs(trackIDs)
+		baseRequest := buildLookupRequest(data)
+		batches := chunkInt64(trackIDs)
 		for _, batch := range batches {
-			lookupLimit := int64(len(batch))
-			result, err := d.client.Lookup(readCtx, batch,
-				data.Entity.ValueString(),
-				data.Country.ValueString(),
-				lookupLimit)
+			req := baseRequest
+			req.IDs = batch
+			req.Limit = lookupLimitForBatch(data.Limit, len(batch), true)
 
+			result, err := d.client.Lookup(readCtx, req)
 			if err != nil {
 				if notFoundErr, ok := err.(*client.NotFoundError); ok {
 					for _, id := range notFoundErr.MissingIDs {
@@ -408,7 +596,7 @@ func (d *ContentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 			return
 		}
 
-	} else if !data.IDs.IsNull() {
+	case !data.IDs.IsNull():
 		var ids []int64
 		resp.Diagnostics.Append(data.IDs.ElementsAs(ctx, &ids, false)...)
 		if resp.Diagnostics.HasError() {
@@ -416,14 +604,14 @@ func (d *ContentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		}
 
 		var allMissingIDs []int64
-		batches := chunkIDs(ids)
+		baseRequest := buildLookupRequest(data)
+		batches := chunkInt64(ids)
 		for _, batch := range batches {
-			lookupLimit := int64(len(batch))
-			result, err := d.client.Lookup(readCtx, batch,
-				data.Entity.ValueString(),
-				data.Country.ValueString(),
-				lookupLimit)
+			req := baseRequest
+			req.IDs = batch
+			req.Limit = lookupLimitForBatch(data.Limit, len(batch), true)
 
+			result, err := d.client.Lookup(readCtx, req)
 			if err != nil {
 				if notFoundErr, ok := err.(*client.NotFoundError); ok {
 					allMissingIDs = append(allMissingIDs, notFoundErr.MissingIDs...)
@@ -443,13 +631,169 @@ func (d *ContentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 			return
 		}
 
-	} else {
-		result, err := d.client.Search(readCtx,
-			data.Term.ValueString(),
-			data.Media.ValueString(),
-			data.Entity.ValueString(),
-			data.Country.ValueString(),
-			data.Limit.ValueInt64())
+	case !data.AMGArtistIDs.IsNull():
+		var amgIDs []int64
+		resp.Diagnostics.Append(data.AMGArtistIDs.ElementsAs(ctx, &amgIDs, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		baseRequest := buildLookupRequest(data)
+		batches := chunkInt64(amgIDs)
+		for _, batch := range batches {
+			req := baseRequest
+			req.AMGArtistIDs = batch
+			req.Limit = lookupLimitForBatch(data.Limit, len(batch), false)
+
+			result, err := d.client.Lookup(readCtx, req)
+			if err != nil {
+				resp.Diagnostics.AddError("API Request Failed", err.Error())
+				return
+			}
+			results = append(results, result.Results...)
+		}
+
+	case !data.AMGAlbumIDs.IsNull():
+		var amgIDs []int64
+		resp.Diagnostics.Append(data.AMGAlbumIDs.ElementsAs(ctx, &amgIDs, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		baseRequest := buildLookupRequest(data)
+		batches := chunkInt64(amgIDs)
+		for _, batch := range batches {
+			req := baseRequest
+			req.AMGAlbumIDs = batch
+			req.Limit = lookupLimitForBatch(data.Limit, len(batch), false)
+
+			result, err := d.client.Lookup(readCtx, req)
+			if err != nil {
+				resp.Diagnostics.AddError("API Request Failed", err.Error())
+				return
+			}
+			results = append(results, result.Results...)
+		}
+
+	case !data.AMGVideoIDs.IsNull():
+		var amgIDs []int64
+		resp.Diagnostics.Append(data.AMGVideoIDs.ElementsAs(ctx, &amgIDs, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		baseRequest := buildLookupRequest(data)
+		batches := chunkInt64(amgIDs)
+		for _, batch := range batches {
+			req := baseRequest
+			req.AMGVideoIDs = batch
+			req.Limit = lookupLimitForBatch(data.Limit, len(batch), false)
+
+			result, err := d.client.Lookup(readCtx, req)
+			if err != nil {
+				resp.Diagnostics.AddError("API Request Failed", err.Error())
+				return
+			}
+			results = append(results, result.Results...)
+		}
+
+	case !data.UPCs.IsNull():
+		var upcs []string
+		resp.Diagnostics.Append(data.UPCs.ElementsAs(ctx, &upcs, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		baseRequest := buildLookupRequest(data)
+		batches := chunkStrings(upcs)
+		for _, batch := range batches {
+			req := baseRequest
+			req.UPCs = batch
+			req.Limit = lookupLimitForBatch(data.Limit, len(batch), false)
+
+			result, err := d.client.Lookup(readCtx, req)
+			if err != nil {
+				resp.Diagnostics.AddError("API Request Failed", err.Error())
+				return
+			}
+			results = append(results, result.Results...)
+		}
+
+	case !data.ISBNs.IsNull():
+		var isbns []string
+		resp.Diagnostics.Append(data.ISBNs.ElementsAs(ctx, &isbns, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		baseRequest := buildLookupRequest(data)
+		batches := chunkStrings(isbns)
+		for _, batch := range batches {
+			req := baseRequest
+			req.ISBNs = batch
+			req.Limit = lookupLimitForBatch(data.Limit, len(batch), false)
+
+			result, err := d.client.Lookup(readCtx, req)
+			if err != nil {
+				resp.Diagnostics.AddError("API Request Failed", err.Error())
+				return
+			}
+			results = append(results, result.Results...)
+		}
+
+	case !data.BundleIDs.IsNull():
+		var bundleIDs []string
+		resp.Diagnostics.Append(data.BundleIDs.ElementsAs(ctx, &bundleIDs, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		baseRequest := buildLookupRequest(data)
+		batches := chunkStrings(bundleIDs)
+		for _, batch := range batches {
+			req := baseRequest
+			req.BundleIDs = batch
+			req.Limit = lookupLimitForBatch(data.Limit, len(batch), false)
+
+			result, err := d.client.Lookup(readCtx, req)
+			if err != nil {
+				resp.Diagnostics.AddError("API Request Failed", err.Error())
+				return
+			}
+			results = append(results, result.Results...)
+		}
+
+	default:
+		searchReq := client.SearchRequest{
+			Term:      data.Term.ValueString(),
+			Media:     stringValue(data.Media),
+			Entity:    stringValue(data.Entity),
+			Country:   stringValue(data.Country),
+			Attribute: stringValue(data.Attribute),
+		}
+
+		if !data.Limit.IsNull() && !data.Limit.IsUnknown() {
+			searchReq.Limit = data.Limit.ValueInt64()
+		}
+		if !data.Lang.IsNull() && !data.Lang.IsUnknown() {
+			searchReq.Lang = data.Lang.ValueString()
+		}
+		if !data.Version.IsNull() && !data.Version.IsUnknown() {
+			searchReq.Version = data.Version.ValueInt64()
+		}
+		if !data.Explicit.IsNull() && !data.Explicit.IsUnknown() {
+			explicit := data.Explicit.ValueBool()
+			searchReq.Explicit = &explicit
+		}
+		if !data.Offset.IsNull() && !data.Offset.IsUnknown() {
+			offset := data.Offset.ValueInt64()
+			searchReq.Offset = &offset
+		}
+		if !data.Callback.IsNull() && !data.Callback.IsUnknown() {
+			searchReq.Callback = data.Callback.ValueString()
+		}
+
+		result, err := d.client.Search(readCtx, searchReq)
 		if err != nil {
 			resp.Diagnostics.AddError("API Request Failed", err.Error())
 			return
@@ -570,8 +914,8 @@ func parseAppStoreURL(urlStr string) (trackID int64, countryCode string) {
 	return trackID, countryCode
 }
 
-// chunkIDs splits a slice of IDs into batches of maxLookupBatchSize.
-func chunkIDs(ids []int64) [][]int64 {
+// chunkInt64 splits a slice of int64 values into batches of maxLookupBatchSize.
+func chunkInt64(ids []int64) [][]int64 {
 	const maxLookupBatchSize = 200
 	var batches [][]int64
 	for i := 0; i < len(ids); i += maxLookupBatchSize {
@@ -582,4 +926,46 @@ func chunkIDs(ids []int64) [][]int64 {
 		batches = append(batches, ids[i:end])
 	}
 	return batches
+}
+
+// chunkStrings splits a slice of strings into batches of maxLookupBatchSize.
+func chunkStrings(values []string) [][]string {
+	const maxLookupBatchSize = 200
+	var batches [][]string
+	for i := 0; i < len(values); i += maxLookupBatchSize {
+		end := i + maxLookupBatchSize
+		if end > len(values) {
+			end = len(values)
+		}
+		batches = append(batches, values[i:end])
+	}
+	return batches
+}
+
+// lookupLimitForBatch returns the effective limit for a lookup request batch.
+func lookupLimitForBatch(limit types.Int64, batchSize int, autoAlign bool) int64 {
+	if !limit.IsNull() && !limit.IsUnknown() {
+		return limit.ValueInt64()
+	}
+	if autoAlign {
+		return int64(batchSize)
+	}
+	return 0
+}
+
+// buildLookupRequest creates a baseline lookup request populated with shared fields.
+func buildLookupRequest(data ContentDataSourceModel) client.LookupRequest {
+	return client.LookupRequest{
+		Entity:  stringValue(data.Entity),
+		Country: stringValue(data.Country),
+		Sort:    stringValue(data.Sort),
+	}
+}
+
+// stringValue safely returns the string value when set.
+func stringValue(v types.String) string {
+	if v.IsNull() || v.IsUnknown() {
+		return ""
+	}
+	return v.ValueString()
 }
