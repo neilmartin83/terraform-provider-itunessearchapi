@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.0](https://github.com/neilmartin83/terraform-provider-itunessearchapi/compare/v1.10.0...v1.11.0) (2026-01-25)
+
+
+### Features
+
+* add additional lookup parameters for Bundle ID,  AMG values, ISBns etc ([#29](https://github.com/neilmartin83/terraform-provider-itunessearchapi/issues/29)) ([cb9cd19](https://github.com/neilmartin83/terraform-provider-itunessearchapi/commit/cb9cd19ae6061c9deede596654ba168b7a2479fe))
+
 ## [1.10.0](https://github.com/neilmartin83/terraform-provider-itunessearchapi/compare/v1.9.2...v1.10.0) (2025-12-20)
 
 
