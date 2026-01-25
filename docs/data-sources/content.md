@@ -61,10 +61,10 @@ output "lookup_results" {
 
 - `app_store_urls` (List of String) List of App Store URLs. Mutually exclusive with term and ids.
 - `country` (String) ISO 2-letter country code (lowercase). See http://en.wikipedia.org/wiki/ISO_3166-1_alpha-2 for a list of ISO Country Codes.
-- `entity` (String) The type of results you want returned, relative to the specified media type.
+- `entity` (String) The type of results you want returned, relative to the specified media type. Supported values: 'movieArtist', 'movie', 'podcastAuthor', 'podcast', 'podcastEpisode', 'musicArtist', 'musicTrack', 'album', 'musicVideo', 'mix', 'song', 'audiobookAuthor', 'audiobook', 'shortFilmArtist', 'shortFilm', 'tvEpisode', 'tvSeason', 'software', 'iPadSoftware', 'desktopSoftware', 'ebook', 'allArtist', 'allTrack'. See the iTunes Search API documentation for more details.
 - `ids` (List of Number) List of iTunes IDs to look up specific content. Mutually exclusive with app_store_urls and term.
-- `limit` (Number) Maximum number of results.
-- `media` (String) Media type, defaults to 'all'. Supported values: 'movie', 'podcast', 'music', 'musicVideo', 'audiobook', 'shortFilm', 'tvShow', 'software', 'ebook', 'all'
+- `limit` (Number) Maximum number of results to return when performing term-based searches. Lookup requests automatically align the limit with the number of App Store URLs or IDs you provide. Valid range is 1-200.
+- `media` (String) Media type, defaults to 'all'. Supported values: 'movie', 'podcast', 'music', 'musicVideo', 'audiobook', 'shortFilm', 'tvShow', 'software', 'ebook', 'all'. See the iTunes Search API documentation for more details.
 - `term` (String) Search term (e.g. app name). Mutually exclusive with app_store_urls and ids.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 

@@ -84,13 +84,13 @@ func (d *ContentDataSource) Metadata(ctx context.Context, req datasource.Metadat
 
 func (d *ContentDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Search for, or lookup content in the iTunes Store.",
+		MarkdownDescription: "Search for, or lookup content in the iTunes Store.",
 		Attributes: map[string]schema.Attribute{
 			"timeouts": timeouts.Attributes(ctx),
 			"app_store_urls": schema.ListAttribute{
-				Optional:    true,
-				ElementType: types.StringType,
-				Description: "List of App Store URLs. Mutually exclusive with term and ids.",
+				Optional:            true,
+				ElementType:         types.StringType,
+				MarkdownDescription: "List of App Store URLs. Mutually exclusive with term and ids.",
 				Validators: []validator.List{
 					listvalidator.ExactlyOneOf(
 						path.MatchRelative().AtParent().AtName("term"),
@@ -103,8 +103,8 @@ func (d *ContentDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 				},
 			},
 			"term": schema.StringAttribute{
-				Optional:    true,
-				Description: "Search term (e.g. app name). Mutually exclusive with app_store_urls and ids.",
+				Optional:            true,
+				MarkdownDescription: "Search term (e.g. app name). Mutually exclusive with app_store_urls and ids.",
 				Validators: []validator.String{
 					stringvalidator.ExactlyOneOf(
 						path.MatchRoot("app_store_urls"),
@@ -113,9 +113,9 @@ func (d *ContentDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 				},
 			},
 			"ids": schema.ListAttribute{
-				Optional:    true,
-				ElementType: types.Int64Type,
-				Description: "List of iTunes IDs to look up specific content. Mutually exclusive with app_store_urls and term.",
+				Optional:            true,
+				ElementType:         types.Int64Type,
+				MarkdownDescription: "List of iTunes IDs to look up specific content. Mutually exclusive with app_store_urls and term.",
 				Validators: []validator.List{
 					listvalidator.ExactlyOneOf(
 						path.MatchRoot("app_store_urls"),
@@ -124,8 +124,8 @@ func (d *ContentDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 				},
 			},
 			"country": schema.StringAttribute{
-				Optional:    true,
-				Description: "ISO 2-letter country code (lowercase). See http://en.wikipedia.org/wiki/ISO_3166-1_alpha-2 for a list of ISO Country Codes.",
+				Optional:            true,
+				MarkdownDescription: "ISO 2-letter country code (lowercase). See http://en.wikipedia.org/wiki/ISO_3166-1_alpha-2 for a list of ISO Country Codes.",
 				Validators: []validator.String{
 					stringvalidator.ConflictsWith(
 						path.MatchRoot("app_store_urls"),
@@ -135,8 +135,8 @@ func (d *ContentDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 				},
 			},
 			"media": schema.StringAttribute{
-				Optional:    true,
-				Description: "Media type, defaults to 'all'. Supported values: 'movie', 'podcast', 'music', 'musicVideo', 'audiobook', 'shortFilm', 'tvShow', 'software', 'ebook', 'all'",
+				Optional:            true,
+				MarkdownDescription: "Media type, defaults to 'all'. Supported values: 'movie', 'podcast', 'music', 'musicVideo', 'audiobook', 'shortFilm', 'tvShow', 'software', 'ebook', 'all'. See the iTunes Search API documentation for more details.",
 				Validators: []validator.String{
 					stringvalidator.OneOf(
 						"movie",
@@ -153,8 +153,8 @@ func (d *ContentDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 				},
 			},
 			"entity": schema.StringAttribute{
-				Optional:    true,
-				Description: "The type of results you want returned, relative to the specified media type.",
+				Optional:            true,
+				MarkdownDescription: "The type of results you want returned, relative to the specified media type. Supported values: 'movieArtist', 'movie', 'podcastAuthor', 'podcast', 'podcastEpisode', 'musicArtist', 'musicTrack', 'album', 'musicVideo', 'mix', 'song', 'audiobookAuthor', 'audiobook', 'shortFilmArtist', 'shortFilm', 'tvEpisode', 'tvSeason', 'software', 'iPadSoftware', 'desktopSoftware', 'ebook', 'allArtist', 'allTrack'. See the iTunes Search API documentation for more details.",
 				Validators: []validator.String{
 					stringvalidator.AlsoRequires(
 						path.MatchRoot("media"),
@@ -187,112 +187,115 @@ func (d *ContentDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 				},
 			},
 			"limit": schema.Int64Attribute{
-				Optional:    true,
-				Description: "Maximum number of results.",
+				Optional:            true,
+				MarkdownDescription: "Maximum number of results to return when performing term-based searches. Lookup requests automatically align the limit with the number of App Store URLs or IDs you provide. Valid range is 1-200.",
 				Validators: []validator.Int64{
+					int64validator.AlsoRequires(
+						path.MatchRoot("term"),
+					),
 					int64validator.AtLeast(1),
 					int64validator.AtMost(200),
 				},
 			},
 			"results": schema.ListNestedAttribute{
-				Computed:    true,
-				Description: "List of content search results.",
+				Computed:            true,
+				MarkdownDescription: "List of content search results.",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"track_name": schema.StringAttribute{
-							Description: "Name of the track.",
-							Computed:    true,
+							MarkdownDescription: "Name of the track.",
+							Computed:            true,
 						},
 						"bundle_id": schema.StringAttribute{
-							Description: "Bundle ID for apps.",
-							Computed:    true,
+							MarkdownDescription: "Bundle ID for apps.",
+							Computed:            true,
 						},
 						"track_id": schema.Int64Attribute{
-							Description: "iTunes track ID.",
-							Computed:    true,
+							MarkdownDescription: "iTunes track ID.",
+							Computed:            true,
 						},
 						"seller_name": schema.StringAttribute{
-							Description: "Name of the seller.",
-							Computed:    true,
+							MarkdownDescription: "Name of the seller.",
+							Computed:            true,
 						},
 						"kind": schema.StringAttribute{
-							Description: "Kind of content (e.g., software, ebook).",
-							Computed:    true,
+							MarkdownDescription: "Kind of content (e.g., software, ebook).",
+							Computed:            true,
 						},
 						"description": schema.StringAttribute{
-							Description: "Description of the content.",
-							Computed:    true,
+							MarkdownDescription: "Description of the content.",
+							Computed:            true,
 						},
 						"release_date": schema.StringAttribute{
-							Description: "Release date.",
-							Computed:    true,
+							MarkdownDescription: "Release date.",
+							Computed:            true,
 						},
 						"price": schema.Float64Attribute{
-							Description: "Price.",
-							Computed:    true,
+							MarkdownDescription: "Price.",
+							Computed:            true,
 						},
 						"formatted_price": schema.StringAttribute{
-							Description: "Formatted price string.",
-							Computed:    true,
+							MarkdownDescription: "Formatted price string.",
+							Computed:            true,
 						},
 						"currency": schema.StringAttribute{
-							Description: "Currency code.",
-							Computed:    true,
+							MarkdownDescription: "Currency code.",
+							Computed:            true,
 						},
 						"version": schema.StringAttribute{
-							Description: "Current version.",
-							Computed:    true,
+							MarkdownDescription: "Current version.",
+							Computed:            true,
 						},
 						"primary_genre": schema.StringAttribute{
-							Description: "Primary genre.",
-							Computed:    true,
+							MarkdownDescription: "Primary genre.",
+							Computed:            true,
 						},
 						"minimum_os_version": schema.StringAttribute{
-							Description: "Minimum OS version required.",
-							Computed:    true,
+							MarkdownDescription: "Minimum OS version required.",
+							Computed:            true,
 						},
 						"file_size_bytes": schema.StringAttribute{
-							Description: "File size in bytes.",
-							Computed:    true,
+							MarkdownDescription: "File size in bytes.",
+							Computed:            true,
 						},
 						"artist_view_url": schema.StringAttribute{
-							Description: "URL to artist view.",
-							Computed:    true,
+							MarkdownDescription: "URL to artist view.",
+							Computed:            true,
 						},
 						"artwork_url": schema.StringAttribute{
-							Description: "Artwork URL.",
-							Computed:    true,
+							MarkdownDescription: "Artwork URL.",
+							Computed:            true,
 						},
 						"artwork_base64": schema.StringAttribute{
-							Description: "Base64-encoded artwork image.",
-							Computed:    true,
+							MarkdownDescription: "Base64-encoded artwork image.",
+							Computed:            true,
 						},
 						"track_view_url": schema.StringAttribute{
-							Description: "URL to track view.",
-							Computed:    true,
+							MarkdownDescription: "URL to track view.",
+							Computed:            true,
 						},
 						"supported_devices": schema.ListAttribute{
-							Description: "List of supported devices.",
-							Computed:    true,
-							ElementType: types.StringType,
+							MarkdownDescription: "List of supported devices.",
+							Computed:            true,
+							ElementType:         types.StringType,
 						},
 						"genres": schema.ListAttribute{
-							Description: "List of genres.",
-							Computed:    true,
-							ElementType: types.StringType,
+							MarkdownDescription: "List of genres.",
+							Computed:            true,
+							ElementType:         types.StringType,
 						},
 						"languages": schema.ListAttribute{
-							Description: "List of supported languages.",
-							Computed:    true,
-							ElementType: types.StringType,
+							MarkdownDescription: "List of supported languages.",
+							Computed:            true,
+							ElementType:         types.StringType,
 						},
 						"average_rating": schema.Float64Attribute{
-							Description: "Average user rating.",
-							Computed:    true,
+							MarkdownDescription: "Average user rating.",
+							Computed:            true,
 						},
 						"rating_count": schema.Int64Attribute{
-							Description: "Number of ratings.",
-							Computed:    true,
+							MarkdownDescription: "Number of ratings.",
+							Computed:            true,
 						},
 					},
 				},
@@ -374,10 +377,11 @@ func (d *ContentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 
 		batches := chunkIDs(trackIDs)
 		for _, batch := range batches {
+			lookupLimit := int64(len(batch))
 			result, err := d.client.Lookup(readCtx, batch,
 				data.Entity.ValueString(),
 				data.Country.ValueString(),
-				data.Limit.ValueInt64())
+				lookupLimit)
 
 			if err != nil {
 				if notFoundErr, ok := err.(*client.NotFoundError); ok {
@@ -414,10 +418,11 @@ func (d *ContentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		var allMissingIDs []int64
 		batches := chunkIDs(ids)
 		for _, batch := range batches {
+			lookupLimit := int64(len(batch))
 			result, err := d.client.Lookup(readCtx, batch,
 				data.Entity.ValueString(),
 				data.Country.ValueString(),
-				data.Limit.ValueInt64())
+				lookupLimit)
 
 			if err != nil {
 				if notFoundErr, ok := err.(*client.NotFoundError); ok {

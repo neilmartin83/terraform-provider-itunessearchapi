@@ -162,8 +162,13 @@ func (e *NotFoundError) Error() string {
 func (c *Client) Lookup(ctx context.Context, ids []int64, entity, country string, limit int64) (*ContentResponse, error) {
 	query := url.Values{}
 	query.Set("id", strings.Join(c.stringifyIDs(ids), ","))
-	query.Set("limit", strconv.Itoa(maxLookupBatchSize))
-	c.addCommonParameters(query, entity, country, limit)
+
+	limitToUse := limit
+	if limitToUse > maxLookupBatchSize {
+		limitToUse = maxLookupBatchSize
+	}
+
+	c.addCommonParameters(query, entity, country, limitToUse)
 
 	apiURL := fmt.Sprintf("https://itunes.apple.com/lookup?%s", query.Encode())
 
