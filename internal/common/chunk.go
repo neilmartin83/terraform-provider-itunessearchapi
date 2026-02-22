@@ -1,3 +1,6 @@
+// Copyright Neil Martin 2026
+// SPDX-License-Identifier: MPL-2.0
+
 package common
 
 // ChunkInt64 splits a slice of int64 values into batches of the given size.
