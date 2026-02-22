@@ -13,7 +13,7 @@ func TestTokenBucket_InitialTokensAvailable(t *testing.T) {
 	tb := newTokenBucket()
 	ctx := context.Background()
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		if err := tb.take(ctx); err != nil {
 			t.Fatalf("take %d failed: %v", i, err)
 		}

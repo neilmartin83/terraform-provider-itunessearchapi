@@ -7,10 +7,7 @@ package common
 func ChunkInt64(ids []int64, batchSize int) [][]int64 {
 	var batches [][]int64
 	for i := 0; i < len(ids); i += batchSize {
-		end := i + batchSize
-		if end > len(ids) {
-			end = len(ids)
-		}
+		end := min(i+batchSize, len(ids))
 		batches = append(batches, ids[i:end])
 	}
 	return batches
@@ -20,10 +17,7 @@ func ChunkInt64(ids []int64, batchSize int) [][]int64 {
 func ChunkStrings(values []string, batchSize int) [][]string {
 	var batches [][]string
 	for i := 0; i < len(values); i += batchSize {
-		end := i + batchSize
-		if end > len(values) {
-			end = len(values)
-		}
+		end := min(i+batchSize, len(values))
 		batches = append(batches, values[i:end])
 	}
 	return batches

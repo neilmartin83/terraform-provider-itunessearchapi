@@ -498,7 +498,7 @@ func (d *ContentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 
 	data.Results = mapResultsToModel(readCtx, results)
 
-	tflog.Debug(ctx, "Content data source read", map[string]interface{}{
+	tflog.Debug(ctx, "Content data source read", map[string]any{
 		"result_count": len(data.Results),
 	})
 
