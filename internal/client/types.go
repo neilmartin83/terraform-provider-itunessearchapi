@@ -13,7 +13,7 @@ import (
 type Logger interface {
 	LogRequest(ctx context.Context, method, url string, body []byte)
 	LogResponse(ctx context.Context, statusCode int, headers http.Header, body []byte)
-	LogAuth(ctx context.Context, message string, fields map[string]interface{})
+	LogAuth(ctx context.Context, message string, fields map[string]any)
 }
 
 // APIError represents an error response from the iTunes Search API.

@@ -57,7 +57,7 @@ func buildLookupRequest(data ContentDataSourceModel) client.LookupRequest {
 
 // downloadAndEncodeImage downloads an image from a URL and returns it as a base64-encoded string.
 func downloadAndEncodeImage(ctx context.Context, httpClient *http.Client, imageURL string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", imageURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, imageURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("error creating request: %w", err)
 	}
@@ -370,7 +370,7 @@ func mapResultsToModel(ctx context.Context, results []client.ContentResult) []Co
 		if artworkURL != "" {
 			encoded, err := downloadAndEncodeImage(ctx, httpClient, artworkURL)
 			if err != nil {
-				tflog.Warn(ctx, "Failed to download artwork", map[string]interface{}{
+				tflog.Warn(ctx, "Failed to download artwork", map[string]any{
 					"track_name": result.TrackName,
 					"error":      err.Error(),
 				})

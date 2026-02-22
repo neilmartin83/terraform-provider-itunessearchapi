@@ -55,7 +55,7 @@ func (c *Client) doRequest(ctx context.Context, url string) (*http.Response, err
 		return nil, fmt.Errorf("rate limiter error: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -106,12 +106,9 @@ func (c *Client) doRequest(ctx context.Context, url string) (*http.Response, err
 		if retryAfter != "" {
 			seconds, err := time.ParseDuration(retryAfter + "s")
 			if err == nil {
-				waitDuration := seconds + (1 * time.Second)
-				if waitDuration > common.MaxRetryWait {
-					waitDuration = common.MaxRetryWait
-				}
+				waitDuration := min(seconds+(1*time.Second), common.MaxRetryWait)
 				if c.logger != nil {
-					c.logger.LogAuth(ctx, "Rate limited, waiting before retry", map[string]interface{}{
+					c.logger.LogAuth(ctx, "Rate limited, waiting before retry", map[string]any{
 						"retry_after_seconds": retryAfter,
 						"wait_duration":       waitDuration.String(),
 						"retry_count":         retryCount,
@@ -125,7 +122,7 @@ func (c *Client) doRequest(ctx context.Context, url string) (*http.Response, err
 				continue
 			}
 			if c.logger != nil {
-				c.logger.LogAuth(ctx, "Failed to parse Retry-After header", map[string]interface{}{
+				c.logger.LogAuth(ctx, "Failed to parse Retry-After header", map[string]any{
 					"retry_after": retryAfter,
 					"error":       err.Error(),
 				})

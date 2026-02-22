@@ -51,10 +51,7 @@ func (c *Client) Lookup(ctx context.Context, req LookupRequest) (*ContentRespons
 		return nil, fmt.Errorf("lookup requires at least one selector parameter")
 	}
 
-	limitToUse := req.Limit
-	if limitToUse > common.MaxLookupBatchSize {
-		limitToUse = common.MaxLookupBatchSize
-	}
+	limitToUse := min(req.Limit, common.MaxLookupBatchSize)
 
 	c.addCommonParameters(query, req.Entity, req.Country, limitToUse)
 
