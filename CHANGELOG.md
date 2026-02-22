@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.12.0](https://github.com/neilmartin83/terraform-provider-itunessearchapi/compare/v1.11.0...v1.12.0) (2026-02-22)
+
+
+### Features
+
+* add copyright and license information to source files ([e050489](https://github.com/neilmartin83/terraform-provider-itunessearchapi/commit/e05048937d0c42a4eacb42d724bef2313365c3ab))
+* add initial configuration files for project setup and testing workflows ([c318b40](https://github.com/neilmartin83/terraform-provider-itunessearchapi/commit/c318b4096b3c795701501e12ba50eda15f666e07))
+* add tools for generation ([#32](https://github.com/neilmartin83/terraform-provider-itunessearchapi/issues/32)) ([6980ecc](https://github.com/neilmartin83/terraform-provider-itunessearchapi/commit/6980eccef3121b730d603028802b4afb46c1341a))
+* update .gitignore and .goreleaser.yml for improved binary handling and formatting ([6a5d991](https://github.com/neilmartin83/terraform-provider-itunessearchapi/commit/6a5d9916c7c83bb05d836b6f5d3ea99a2678c01d))
+
 ## [1.11.0](https://github.com/neilmartin83/terraform-provider-itunessearchapi/compare/v1.10.0...v1.11.0) (2026-01-25)
 
 
