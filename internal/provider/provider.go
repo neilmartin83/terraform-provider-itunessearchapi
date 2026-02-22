@@ -21,11 +21,13 @@ type ITunesProvider struct {
 	version string
 }
 
+// Metadata sets the provider type name and version.
 func (p *ITunesProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
 	resp.TypeName = "itunessearchapi"
 	resp.Version = p.version
 }
 
+// Schema defines the provider-level configuration schema.
 func (p *ITunesProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Interact with the iTunes Search API: https://performance-partners.apple.com/search-api",
@@ -33,6 +35,7 @@ func (p *ITunesProvider) Schema(ctx context.Context, req provider.SchemaRequest,
 	}
 }
 
+// Configure initializes the API client and makes it available to data sources.
 func (p *ITunesProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
 	clientObj := client.NewClient()
 	clientObj.SetLogger(NewTerraformLogger())
@@ -42,16 +45,19 @@ func (p *ITunesProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	resp.ResourceData = clientObj
 }
 
+// Resources returns the provider's managed resources.
 func (p *ITunesProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return nil
 }
 
+// DataSources returns the provider's data sources.
 func (p *ITunesProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		content.NewContentDataSource,
 	}
 }
 
+// New returns a factory function that creates a new ITunesProvider instance.
 func New(version string) func() provider.Provider {
 	return func() provider.Provider {
 		return &ITunesProvider{
