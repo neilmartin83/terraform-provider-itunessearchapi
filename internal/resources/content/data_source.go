@@ -2,14 +2,8 @@ package content
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
-	"io"
-	"net/http"
 	"regexp"
-	"strconv"
-	"strings"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -23,78 +17,27 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/neilmartin83/terraform-provider-itunessearchapi/internal/client"
+	"github.com/neilmartin83/terraform-provider-itunessearchapi/internal/common"
 )
 
 var _ datasource.DataSource = &ContentDataSource{}
-
-const defaultReadTimeout = 90 * time.Second
-
-func NewContentDataSource() datasource.DataSource {
-	return &ContentDataSource{}
-}
 
 // ContentDataSource defines the data source implementation.
 type ContentDataSource struct {
 	client *client.Client
 }
 
-// ContentDataSourceModel describes the data source data model.
-type ContentDataSourceModel struct {
-	Timeouts     timeouts.Value       `tfsdk:"timeouts"`
-	AppStoreURLs types.List           `tfsdk:"app_store_urls"`
-	Term         types.String         `tfsdk:"term"`
-	IDs          types.List           `tfsdk:"ids"`
-	AMGArtistIDs types.List           `tfsdk:"amg_artist_ids"`
-	AMGAlbumIDs  types.List           `tfsdk:"amg_album_ids"`
-	AMGVideoIDs  types.List           `tfsdk:"amg_video_ids"`
-	UPCs         types.List           `tfsdk:"upcs"`
-	ISBNs        types.List           `tfsdk:"isbns"`
-	BundleIDs    types.List           `tfsdk:"bundle_ids"`
-	Country      types.String         `tfsdk:"country"`
-	Media        types.String         `tfsdk:"media"`
-	Entity       types.String         `tfsdk:"entity"`
-	Limit        types.Int64          `tfsdk:"limit"`
-	Sort         types.String         `tfsdk:"sort"`
-	Attribute    types.String         `tfsdk:"attribute"`
-	Lang         types.String         `tfsdk:"lang"`
-	Version      types.Int64          `tfsdk:"version"`
-	Explicit     types.Bool           `tfsdk:"explicit"`
-	Offset       types.Int64          `tfsdk:"offset"`
-	Callback     types.String         `tfsdk:"callback"`
-	Results      []ContentResultModel `tfsdk:"results"`
+// NewContentDataSource returns a new instance of the content data source.
+func NewContentDataSource() datasource.DataSource {
+	return &ContentDataSource{}
 }
 
-// ContentResultModel describes a single content search result.
-type ContentResultModel struct {
-	TrackName        types.String   `tfsdk:"track_name"`
-	BundleID         types.String   `tfsdk:"bundle_id"`
-	TrackID          types.Int64    `tfsdk:"track_id"`
-	SellerName       types.String   `tfsdk:"seller_name"`
-	Kind             types.String   `tfsdk:"kind"`
-	Description      types.String   `tfsdk:"description"`
-	ReleaseDate      types.String   `tfsdk:"release_date"`
-	Price            types.Float64  `tfsdk:"price"`
-	FormattedPrice   types.String   `tfsdk:"formatted_price"`
-	Currency         types.String   `tfsdk:"currency"`
-	Version          types.String   `tfsdk:"version"`
-	PrimaryGenre     types.String   `tfsdk:"primary_genre"`
-	MinimumOSVersion types.String   `tfsdk:"minimum_os_version"`
-	FileSizeBytes    types.String   `tfsdk:"file_size_bytes"`
-	ArtistViewURL    types.String   `tfsdk:"artist_view_url"`
-	ArtworkURL       types.String   `tfsdk:"artwork_url"`
-	ArtworkBase64    types.String   `tfsdk:"artwork_base64"`
-	TrackViewURL     types.String   `tfsdk:"track_view_url"`
-	SupportedDevices []types.String `tfsdk:"supported_devices"`
-	Genres           []types.String `tfsdk:"genres"`
-	Languages        []types.String `tfsdk:"languages"`
-	AverageRating    types.Float64  `tfsdk:"average_rating"`
-	RatingCount      types.Int64    `tfsdk:"rating_count"`
-}
-
+// Metadata sets the data source type name.
 func (d *ContentDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_content"
 }
 
+// Schema defines the data source schema.
 func (d *ContentDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Search for, or lookup content in the iTunes Store.",
@@ -492,13 +435,13 @@ func (d *ContentDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 	}
 }
 
+// Configure sets up the data source with the provider-configured client.
 func (d *ContentDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
 
-	client, ok := req.ProviderData.(*client.Client)
-
+	c, ok := req.ProviderData.(*client.Client)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Data Source Configure Type",
@@ -507,21 +450,21 @@ func (d *ContentDataSource) Configure(ctx context.Context, req datasource.Config
 		return
 	}
 
-	d.client = client
+	d.client = c
 }
 
+// Read retrieves content from the iTunes Search API based on the configured
+// selector (search term or lookup identifiers) and maps the results to state.
 func (d *ContentDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var data ContentDataSourceModel
-
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	readTimeout := defaultReadTimeout
+	readTimeout := common.DefaultReadTimeout
 	if !data.Timeouts.IsNull() && !data.Timeouts.IsUnknown() {
-		configuredTimeout, timeoutDiags := data.Timeouts.Read(ctx, defaultReadTimeout)
+		configuredTimeout, timeoutDiags := data.Timeouts.Read(ctx, common.DefaultReadTimeout)
 		resp.Diagnostics.Append(timeoutDiags...)
 		if resp.Diagnostics.HasError() {
 			return
@@ -534,438 +477,27 @@ func (d *ContentDataSource) Read(ctx context.Context, req datasource.ReadRequest
 
 	var results []client.ContentResult
 
-	switch {
-	case !data.AppStoreURLs.IsNull():
-		var urls []string
-		resp.Diagnostics.Append(data.AppStoreURLs.ElementsAs(ctx, &urls, false)...)
+	if !data.Term.IsNull() {
+		searchResults, diags := executeSearch(readCtx, data, d.client)
+		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-
-		var trackIDs []int64
-		countryCode := ""
-		var allMissingURLs []string
-
-		for _, urlStr := range urls {
-			trackID, country := parseAppStoreURL(urlStr)
-
-			if countryCode == "" {
-				countryCode = country
-			} else if countryCode != country {
-				resp.Diagnostics.AddError(
-					"Inconsistent Countries",
-					"All App Store URLs must be from the same country store.",
-				)
-				return
-			}
-
-			trackIDs = append(trackIDs, trackID)
-		}
-
-		data.Country = types.StringValue(countryCode)
-		baseRequest := buildLookupRequest(data)
-		batches := chunkInt64(trackIDs)
-		for _, batch := range batches {
-			req := baseRequest
-			req.IDs = batch
-			req.Limit = lookupLimitForBatch(data.Limit, len(batch), true)
-
-			result, err := d.client.Lookup(readCtx, req)
-			if err != nil {
-				if notFoundErr, ok := err.(*client.NotFoundError); ok {
-					for _, id := range notFoundErr.MissingIDs {
-						for _, url := range urls {
-							if strings.Contains(url, fmt.Sprintf("id%d", id)) {
-								allMissingURLs = append(allMissingURLs, url)
-							}
-						}
-					}
-					continue
-				}
-				resp.Diagnostics.AddError("API Request Failed", err.Error())
-				return
-			}
-			results = append(results, result.Results...)
-		}
-
-		if len(allMissingURLs) > 0 {
-			resp.Diagnostics.AddError(
-				"Some URLs not found",
-				fmt.Sprintf("The following URLs were not found: %v", allMissingURLs),
-			)
-			return
-		}
-
-	case !data.IDs.IsNull():
-		var ids []int64
-		resp.Diagnostics.Append(data.IDs.ElementsAs(ctx, &ids, false)...)
+		results = searchResults
+	} else {
+		lookupResults, diags := executeLookup(readCtx, &data, d.client)
+		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-
-		var allMissingIDs []int64
-		baseRequest := buildLookupRequest(data)
-		batches := chunkInt64(ids)
-		for _, batch := range batches {
-			req := baseRequest
-			req.IDs = batch
-			req.Limit = lookupLimitForBatch(data.Limit, len(batch), true)
-
-			result, err := d.client.Lookup(readCtx, req)
-			if err != nil {
-				if notFoundErr, ok := err.(*client.NotFoundError); ok {
-					allMissingIDs = append(allMissingIDs, notFoundErr.MissingIDs...)
-					continue
-				}
-				resp.Diagnostics.AddError("API Request Failed", err.Error())
-				return
-			}
-			results = append(results, result.Results...)
-		}
-
-		if len(allMissingIDs) > 0 {
-			resp.Diagnostics.AddError(
-				"Resources Not Found",
-				fmt.Sprintf("The following IDs were not found: %v", allMissingIDs),
-			)
-			return
-		}
-
-	case !data.AMGArtistIDs.IsNull():
-		var amgIDs []int64
-		resp.Diagnostics.Append(data.AMGArtistIDs.ElementsAs(ctx, &amgIDs, false)...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		baseRequest := buildLookupRequest(data)
-		batches := chunkInt64(amgIDs)
-		for _, batch := range batches {
-			req := baseRequest
-			req.AMGArtistIDs = batch
-			req.Limit = lookupLimitForBatch(data.Limit, len(batch), false)
-
-			result, err := d.client.Lookup(readCtx, req)
-			if err != nil {
-				resp.Diagnostics.AddError("API Request Failed", err.Error())
-				return
-			}
-			results = append(results, result.Results...)
-		}
-
-	case !data.AMGAlbumIDs.IsNull():
-		var amgIDs []int64
-		resp.Diagnostics.Append(data.AMGAlbumIDs.ElementsAs(ctx, &amgIDs, false)...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		baseRequest := buildLookupRequest(data)
-		batches := chunkInt64(amgIDs)
-		for _, batch := range batches {
-			req := baseRequest
-			req.AMGAlbumIDs = batch
-			req.Limit = lookupLimitForBatch(data.Limit, len(batch), false)
-
-			result, err := d.client.Lookup(readCtx, req)
-			if err != nil {
-				resp.Diagnostics.AddError("API Request Failed", err.Error())
-				return
-			}
-			results = append(results, result.Results...)
-		}
-
-	case !data.AMGVideoIDs.IsNull():
-		var amgIDs []int64
-		resp.Diagnostics.Append(data.AMGVideoIDs.ElementsAs(ctx, &amgIDs, false)...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		baseRequest := buildLookupRequest(data)
-		batches := chunkInt64(amgIDs)
-		for _, batch := range batches {
-			req := baseRequest
-			req.AMGVideoIDs = batch
-			req.Limit = lookupLimitForBatch(data.Limit, len(batch), false)
-
-			result, err := d.client.Lookup(readCtx, req)
-			if err != nil {
-				resp.Diagnostics.AddError("API Request Failed", err.Error())
-				return
-			}
-			results = append(results, result.Results...)
-		}
-
-	case !data.UPCs.IsNull():
-		var upcs []string
-		resp.Diagnostics.Append(data.UPCs.ElementsAs(ctx, &upcs, false)...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		baseRequest := buildLookupRequest(data)
-		batches := chunkStrings(upcs)
-		for _, batch := range batches {
-			req := baseRequest
-			req.UPCs = batch
-			req.Limit = lookupLimitForBatch(data.Limit, len(batch), false)
-
-			result, err := d.client.Lookup(readCtx, req)
-			if err != nil {
-				resp.Diagnostics.AddError("API Request Failed", err.Error())
-				return
-			}
-			results = append(results, result.Results...)
-		}
-
-	case !data.ISBNs.IsNull():
-		var isbns []string
-		resp.Diagnostics.Append(data.ISBNs.ElementsAs(ctx, &isbns, false)...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		baseRequest := buildLookupRequest(data)
-		batches := chunkStrings(isbns)
-		for _, batch := range batches {
-			req := baseRequest
-			req.ISBNs = batch
-			req.Limit = lookupLimitForBatch(data.Limit, len(batch), false)
-
-			result, err := d.client.Lookup(readCtx, req)
-			if err != nil {
-				resp.Diagnostics.AddError("API Request Failed", err.Error())
-				return
-			}
-			results = append(results, result.Results...)
-		}
-
-	case !data.BundleIDs.IsNull():
-		var bundleIDs []string
-		resp.Diagnostics.Append(data.BundleIDs.ElementsAs(ctx, &bundleIDs, false)...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		baseRequest := buildLookupRequest(data)
-		batches := chunkStrings(bundleIDs)
-		for _, batch := range batches {
-			req := baseRequest
-			req.BundleIDs = batch
-			req.Limit = lookupLimitForBatch(data.Limit, len(batch), false)
-
-			result, err := d.client.Lookup(readCtx, req)
-			if err != nil {
-				resp.Diagnostics.AddError("API Request Failed", err.Error())
-				return
-			}
-			results = append(results, result.Results...)
-		}
-
-	default:
-		searchReq := client.SearchRequest{
-			Term:      data.Term.ValueString(),
-			Media:     stringValue(data.Media),
-			Entity:    stringValue(data.Entity),
-			Country:   stringValue(data.Country),
-			Attribute: stringValue(data.Attribute),
-		}
-
-		if !data.Limit.IsNull() && !data.Limit.IsUnknown() {
-			searchReq.Limit = data.Limit.ValueInt64()
-		}
-		if !data.Lang.IsNull() && !data.Lang.IsUnknown() {
-			searchReq.Lang = data.Lang.ValueString()
-		}
-		if !data.Version.IsNull() && !data.Version.IsUnknown() {
-			searchReq.Version = data.Version.ValueInt64()
-		}
-		if !data.Explicit.IsNull() && !data.Explicit.IsUnknown() {
-			explicit := data.Explicit.ValueBool()
-			searchReq.Explicit = &explicit
-		}
-		if !data.Offset.IsNull() && !data.Offset.IsUnknown() {
-			offset := data.Offset.ValueInt64()
-			searchReq.Offset = &offset
-		}
-		if !data.Callback.IsNull() && !data.Callback.IsUnknown() {
-			searchReq.Callback = data.Callback.ValueString()
-		}
-
-		result, err := d.client.Search(readCtx, searchReq)
-		if err != nil {
-			resp.Diagnostics.AddError("API Request Failed", err.Error())
-			return
-		}
-		results = result.Results
+		results = lookupResults
 	}
 
-	var resultItems []ContentResultModel
-	for _, result := range results {
-		artworkURL := result.ArtworkURL
-		if artworkURL != "" && strings.HasSuffix(artworkURL, ".jpg") {
-			artworkURL = strings.TrimSuffix(artworkURL, ".jpg") + ".png"
-		}
-
-		var artworkBase64 string
-		if artworkURL != "" {
-			encoded, err := downloadAndEncodeImage(readCtx, artworkURL)
-			if err != nil {
-				tflog.Warn(ctx, "Failed to download artwork", map[string]interface{}{
-					"track_name": result.TrackName,
-					"error":      err.Error(),
-				})
-			} else {
-				artworkBase64 = encoded
-			}
-		}
-
-		resultItem := ContentResultModel{
-			TrackName:        types.StringValue(result.TrackName),
-			BundleID:         types.StringValue(result.BundleID),
-			TrackID:          types.Int64Value(result.TrackID),
-			SellerName:       types.StringValue(result.SellerName),
-			Kind:             types.StringValue(result.Kind),
-			Description:      types.StringValue(result.Description),
-			ReleaseDate:      types.StringValue(result.ReleaseDate),
-			Price:            types.Float64Value(result.Price),
-			FormattedPrice:   types.StringValue(result.FormattedPrice),
-			Currency:         types.StringValue(result.Currency),
-			Version:          types.StringValue(result.Version),
-			PrimaryGenre:     types.StringValue(result.PrimaryGenre),
-			MinimumOSVersion: types.StringValue(result.MinimumOSVersion),
-			FileSizeBytes:    types.StringValue(result.FileSizeBytes),
-			ArtistViewURL:    types.StringValue(result.ArtistViewURL),
-			ArtworkURL:       types.StringValue(artworkURL),
-			ArtworkBase64:    types.StringValue(artworkBase64),
-			TrackViewURL:     types.StringValue(result.TrackViewURL),
-			AverageRating:    types.Float64Value(result.AverageRating),
-			RatingCount:      types.Int64Value(result.RatingCount),
-		}
-
-		resultItem.SupportedDevices = make([]types.String, len(result.SupportedDevices))
-		for i, device := range result.SupportedDevices {
-			resultItem.SupportedDevices[i] = types.StringValue(device)
-		}
-
-		resultItem.Genres = make([]types.String, len(result.Genres))
-		for i, genre := range result.Genres {
-			resultItem.Genres[i] = types.StringValue(genre)
-		}
-
-		resultItem.Languages = make([]types.String, len(result.Languages))
-		for i, language := range result.Languages {
-			resultItem.Languages[i] = types.StringValue(language)
-		}
-
-		resultItems = append(resultItems, resultItem)
-	}
-
-	data.Results = resultItems
+	data.Results = mapResultsToModel(readCtx, results)
 
 	tflog.Debug(ctx, "Content data source read", map[string]interface{}{
 		"result_count": len(data.Results),
 	})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
-}
-
-// downloadAndEncodeImage downloads an image from a URL and returns it as a base64 encoded string.
-func downloadAndEncodeImage(ctx context.Context, imageURL string) (string, error) {
-	client := &http.Client{Timeout: 30 * time.Second}
-
-	req, err := http.NewRequestWithContext(ctx, "GET", imageURL, nil)
-	if err != nil {
-		return "", fmt.Errorf("error creating request: %v", err)
-	}
-
-	req.Header.Set("User-Agent", "Terraform-Provider-iTunesSearchAPI")
-	req.Header.Set("Accept", "image/*")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("error downloading image: %v", err)
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("image download failed with status code: %d", resp.StatusCode)
-	}
-
-	imageData, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	return base64.StdEncoding.EncodeToString(imageData), nil
-}
-
-// parseAppStoreURL extracts the track ID and country code from an App Store URL.
-func parseAppStoreURL(urlStr string) (trackID int64, countryCode string) {
-	re := regexp.MustCompile(`^https://apps\.apple\.com/([a-z]{2})/.*?/id(\d+)`)
-	matches := re.FindStringSubmatch(urlStr)
-
-	countryCode = matches[1]
-	trackID, _ = strconv.ParseInt(matches[2], 10, 64)
-
-	return trackID, countryCode
-}
-
-// chunkInt64 splits a slice of int64 values into batches of maxLookupBatchSize.
-func chunkInt64(ids []int64) [][]int64 {
-	const maxLookupBatchSize = 200
-	var batches [][]int64
-	for i := 0; i < len(ids); i += maxLookupBatchSize {
-		end := i + maxLookupBatchSize
-		if end > len(ids) {
-			end = len(ids)
-		}
-		batches = append(batches, ids[i:end])
-	}
-	return batches
-}
-
-// chunkStrings splits a slice of strings into batches of maxLookupBatchSize.
-func chunkStrings(values []string) [][]string {
-	const maxLookupBatchSize = 200
-	var batches [][]string
-	for i := 0; i < len(values); i += maxLookupBatchSize {
-		end := i + maxLookupBatchSize
-		if end > len(values) {
-			end = len(values)
-		}
-		batches = append(batches, values[i:end])
-	}
-	return batches
-}
-
-// lookupLimitForBatch returns the effective limit for a lookup request batch.
-func lookupLimitForBatch(limit types.Int64, batchSize int, autoAlign bool) int64 {
-	if !limit.IsNull() && !limit.IsUnknown() {
-		return limit.ValueInt64()
-	}
-	if autoAlign {
-		return int64(batchSize)
-	}
-	return 0
-}
-
-// buildLookupRequest creates a baseline lookup request populated with shared fields.
-func buildLookupRequest(data ContentDataSourceModel) client.LookupRequest {
-	return client.LookupRequest{
-		Entity:  stringValue(data.Entity),
-		Country: stringValue(data.Country),
-		Sort:    stringValue(data.Sort),
-	}
-}
-
-// stringValue safely returns the string value when set.
-func stringValue(v types.String) string {
-	if v.IsNull() || v.IsUnknown() {
-		return ""
-	}
-	return v.ValueString()
 }
