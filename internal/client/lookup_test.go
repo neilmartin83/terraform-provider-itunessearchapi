@@ -14,7 +14,7 @@ import (
 func TestLookup_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"results":[{"trackId":123,"trackName":"Test App"}]}`)
+		_, _ = fmt.Fprint(w, `{"results":[{"trackId":123,"trackName":"Test App"}]}`)
 	}))
 	defer server.Close()
 
@@ -36,7 +36,7 @@ func TestLookup_Success(t *testing.T) {
 func TestLookup_NotFound(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"results":[{"trackId":123,"trackName":"Test App"}]}`)
+		_, _ = fmt.Fprint(w, `{"results":[{"trackId":123,"trackName":"Test App"}]}`)
 	}))
 	defer server.Close()
 
@@ -72,7 +72,7 @@ func TestLookup_LimitCapped(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedLimit = r.URL.Query().Get("limit")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"results":[]}`)
+		_, _ = fmt.Fprint(w, `{"results":[]}`)
 	}))
 	defer server.Close()
 
@@ -91,7 +91,7 @@ func TestLookup_BundleIDs(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedBundleID = r.URL.Query().Get("bundleId")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"results":[{"trackId":1,"bundleId":"com.example.app"}]}`)
+		_, _ = fmt.Fprint(w, `{"results":[{"trackId":1,"bundleId":"com.example.app"}]}`)
 	}))
 	defer server.Close()
 

@@ -119,7 +119,7 @@ func TestDownloadAndEncodeImage_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/png")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, "fake-image-data")
+		_, _ = fmt.Fprint(w, "fake-image-data")
 	}))
 	defer server.Close()
 
