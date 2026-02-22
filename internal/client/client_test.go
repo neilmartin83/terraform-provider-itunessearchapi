@@ -22,7 +22,7 @@ func newTestClient(serverURL string) *Client {
 func TestDoRequest_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"results":[]}`)
+		_, _ = fmt.Fprint(w, `{"results":[]}`)
 	}))
 	defer server.Close()
 
@@ -31,7 +31,7 @@ func TestDoRequest_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected 200, got %d", resp.StatusCode)
@@ -61,7 +61,7 @@ func TestDoRequest_429WithRetryAfter(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"results":[]}`)
+		_, _ = fmt.Fprint(w, `{"results":[]}`)
 	}))
 	defer server.Close()
 
@@ -70,7 +70,7 @@ func TestDoRequest_429WithRetryAfter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if atomic.LoadInt32(&callCount) != 2 {
 		t.Errorf("expected 2 calls, got %d", atomic.LoadInt32(&callCount))

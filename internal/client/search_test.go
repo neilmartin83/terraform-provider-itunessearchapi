@@ -14,7 +14,7 @@ import (
 func TestSearch_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"results":[{"trackId":1,"trackName":"Test"}]}`)
+		_, _ = fmt.Fprint(w, `{"results":[{"trackId":1,"trackName":"Test"}]}`)
 	}))
 	defer server.Close()
 
@@ -35,7 +35,7 @@ func TestSearch_DefaultMedia(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedMedia = r.URL.Query().Get("media")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"results":[]}`)
+		_, _ = fmt.Fprint(w, `{"results":[]}`)
 	}))
 	defer server.Close()
 
@@ -67,7 +67,7 @@ func TestSearch_WithParameters(t *testing.T) {
 			t.Errorf("expected limit %q, got %q", "5", q.Get("limit"))
 		}
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"results":[]}`)
+		_, _ = fmt.Fprint(w, `{"results":[]}`)
 	}))
 	defer server.Close()
 
@@ -86,7 +86,7 @@ func TestSearch_WithParameters(t *testing.T) {
 func TestSearch_JSONPCallback(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `myCallback({"results":[{"trackId":1}]});`)
+		_, _ = fmt.Fprint(w, `myCallback({"results":[{"trackId":1}]});`)
 	}))
 	defer server.Close()
 
@@ -111,7 +111,7 @@ func TestSearch_ExplicitParameter(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedExplicit = r.URL.Query().Get("explicit")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"results":[]}`)
+		_, _ = fmt.Fprint(w, `{"results":[]}`)
 	}))
 	defer server.Close()
 
