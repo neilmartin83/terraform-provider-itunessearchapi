@@ -1,3 +1,6 @@
+// Copyright Neil Martin 2026
+// SPDX-License-Identifier: MPL-2.0
+
 // Package common provides shared utilities, constants, and helper functions
 // used across the provider's packages.
 package common
