@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.2](https://github.com/neilmartin83/terraform-provider-itunessearchapi/compare/v1.12.1...v1.12.2) (2026-05-06)
+
+
+### Bug Fixes
+
+* **client:** enhance retry logic to handle 5xx responses and add backoff delay ([e778031](https://github.com/neilmartin83/terraform-provider-itunessearchapi/commit/e7780315a0b9694fbf4231256cf009f8b0e2121a))
+
 ## [1.12.0](https://github.com/neilmartin83/terraform-provider-itunessearchapi/compare/v1.11.0...v1.12.0) (2026-02-22)
 
 
