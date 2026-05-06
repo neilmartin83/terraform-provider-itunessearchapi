@@ -49,7 +49,7 @@ func (c *Client) setBaseURL(baseURL string) {
 }
 
 // doRequest performs a rate-limited HTTP GET request to the specified URL,
-// retrying on HTTP 429 responses up to MaxRetries times.
+// retrying on HTTP 429 and 5xx responses up to MaxRetries times.
 func (c *Client) doRequest(ctx context.Context, url string) (*http.Response, error) {
 	if err := c.rateLimiter.take(ctx); err != nil {
 		return nil, fmt.Errorf("rate limiter error: %w", err)
@@ -73,7 +73,8 @@ func (c *Client) doRequest(ctx context.Context, url string) (*http.Response, err
 			return nil, fmt.Errorf("error making request: %w", err)
 		}
 
-		if resp.StatusCode != http.StatusTooManyRequests {
+		switch {
+		case resp.StatusCode == http.StatusOK:
 			if c.logger != nil && resp.Body != nil {
 				responseBody, err := io.ReadAll(resp.Body)
 				if err != nil {
@@ -83,53 +84,82 @@ func (c *Client) doRequest(ctx context.Context, url string) (*http.Response, err
 				c.logger.LogResponse(ctx, resp.StatusCode, resp.Header, responseBody)
 				resp.Body = io.NopCloser(bytes.NewBuffer(responseBody))
 			}
-
-			if resp.StatusCode != http.StatusOK {
-				_ = resp.Body.Close()
-				return nil, fmt.Errorf("API request failed with status code: %d", resp.StatusCode)
-			}
 			return resp, nil
-		}
 
-		if c.logger != nil {
-			c.logger.LogResponse(ctx, resp.StatusCode, resp.Header, nil)
-		}
+		case resp.StatusCode == http.StatusTooManyRequests:
+			if c.logger != nil {
+				c.logger.LogResponse(ctx, resp.StatusCode, resp.Header, nil)
+			}
 
-		retryAfter := resp.Header.Get("Retry-After")
-		_ = resp.Body.Close()
+			retryAfter := resp.Header.Get("Retry-After")
+			_ = resp.Body.Close()
 
-		retryCount++
-		if retryCount >= common.MaxRetries {
-			return nil, fmt.Errorf("exceeded maximum retries (%d) for rate-limited requests", common.MaxRetries)
-		}
+			retryCount++
+			if retryCount >= common.MaxRetries {
+				return nil, fmt.Errorf("exceeded maximum retries (%d) for rate-limited requests", common.MaxRetries)
+			}
 
-		if retryAfter != "" {
-			seconds, err := time.ParseDuration(retryAfter + "s")
-			if err == nil {
-				waitDuration := min(seconds+(1*time.Second), common.MaxRetryWait)
+			if retryAfter != "" {
+				seconds, err := time.ParseDuration(retryAfter + "s")
+				if err == nil {
+					waitDuration := min(seconds+(1*time.Second), common.MaxRetryWait)
+					if c.logger != nil {
+						c.logger.LogAuth(ctx, "Rate limited, waiting before retry", map[string]any{
+							"retry_after_seconds": retryAfter,
+							"wait_duration":       waitDuration.String(),
+							"retry_count":         retryCount,
+						})
+					}
+					select {
+					case <-ctx.Done():
+						return nil, ctx.Err()
+					case <-time.After(waitDuration):
+					}
+					continue
+				}
 				if c.logger != nil {
-					c.logger.LogAuth(ctx, "Rate limited, waiting before retry", map[string]any{
-						"retry_after_seconds": retryAfter,
-						"wait_duration":       waitDuration.String(),
-						"retry_count":         retryCount,
+					c.logger.LogAuth(ctx, "Failed to parse Retry-After header", map[string]any{
+						"retry_after": retryAfter,
+						"error":       err.Error(),
 					})
 				}
-				select {
-				case <-ctx.Done():
-					return nil, ctx.Err()
-				case <-time.After(waitDuration):
-				}
-				continue
 			}
+
+			return nil, fmt.Errorf("received 429 Too Many Requests with no valid Retry-After header")
+
+		case resp.StatusCode >= 500:
 			if c.logger != nil {
-				c.logger.LogAuth(ctx, "Failed to parse Retry-After header", map[string]any{
-					"retry_after": retryAfter,
-					"error":       err.Error(),
+				c.logger.LogResponse(ctx, resp.StatusCode, resp.Header, nil)
+			}
+			_ = resp.Body.Close()
+
+			retryCount++
+			if retryCount >= common.MaxRetries {
+				return nil, fmt.Errorf("exceeded maximum retries (%d) for server error (status %d)", common.MaxRetries, resp.StatusCode)
+			}
+
+			waitDuration := min(common.RetryBaseDelay*time.Duration(1<<uint(retryCount-1)), common.MaxRetryWait)
+			if c.logger != nil {
+				c.logger.LogAuth(ctx, "Server error, retrying with backoff", map[string]any{
+					"status_code":   resp.StatusCode,
+					"wait_duration": waitDuration.String(),
+					"retry_count":   retryCount,
 				})
 			}
-		}
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(waitDuration):
+			}
+			continue
 
-		return nil, fmt.Errorf("received 429 Too Many Requests with no valid Retry-After header")
+		default:
+			if c.logger != nil {
+				c.logger.LogResponse(ctx, resp.StatusCode, resp.Header, nil)
+			}
+			_ = resp.Body.Close()
+			return nil, fmt.Errorf("API request failed with status code: %d", resp.StatusCode)
+		}
 	}
 }
 

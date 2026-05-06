@@ -22,5 +22,8 @@ const MaxRetries = 5
 // MaxRetryWait is the maximum duration to wait between retries for rate-limited responses.
 const MaxRetryWait = 60 * time.Second
 
+// RetryBaseDelay is the initial backoff delay for retrying transient server errors (5xx).
+const RetryBaseDelay = 1 * time.Second
+
 // DefaultReadTimeout is the default timeout for data source read operations.
 const DefaultReadTimeout = 90 * time.Second
